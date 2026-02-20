@@ -1,0 +1,3025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a73e8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Leteh Navigation System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css"/>
+<style>
+:root {
+  --blue: #1a73e8;
+  --blue-dark: #1557b0;
+  --blue-light: #e8f0fe;
+  --blue-mid: #4285f4;
+  --green: #0f9d58;
+  --green-light: #e6f4ea;
+  --red: #d93025;
+  --red-light: #fce8e6;
+  --yellow: #f9ab00;
+  --yellow-light: #fef7e0;
+  --purple: #8430ce;
+  --surface: #ffffff;
+  --surface-2: #f8f9fa;
+  --surface-3: #f1f3f4;
+  --border: #dadce0;
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-hint: #9aa0a6;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 100px;
+  --teal: #237f7e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #e8eaed;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+
+/* ─── MAP BASE ─── */
+#map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.leaflet-control-zoom { display: none; }
+
+/* ─── TOP SEARCH BAR ─── */
+.top-bar {
+  position: absolute;
+  top: 12px; left: 12px; right: 12px;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.search-pill {
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 0 14px;
+  height: 52px;
+  pointer-events: all;
+  transition: box-shadow 0.2s;
+}
+.search-pill:focus-within {
+  box-shadow: var(--shadow-lg), 0 0 0 2px var(--blue-light);
+}
+.search-pill-icon { color: var(--blue); font-size: 20px; flex-shrink: 0; }
+.search-pill input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: transparent;
+}
+.search-pill input::placeholder { color: var(--text-hint); }
+.search-pill-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  transition: background 0.15s;
+  color: var(--text-secondary);
+}
+.icon-btn:hover { background: var(--surface-3); }
+.icon-btn:active { background: var(--border); transform: scale(0.93); }
+
+/* ─── CATEGORY CHIPS ─── */
+.category-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  pointer-events: all;
+  scrollbar-width: none;
+}
+.category-chips::-webkit-scrollbar { display: none; }
+.chip {
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.chip:hover { box-shadow: var(--shadow-md); }
+.chip.active { background: var(--blue); color: white; }
+.chip:active { transform: scale(0.96); }
+
+/* ─── SEARCH RESULTS DROPDOWN ─── */
+.search-dropdown {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  pointer-events: all;
+  display: none;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.search-dropdown.open { display: block; }
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--surface-3);
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: var(--surface-2); }
+.sri-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.sri-body { flex: 1; min-width: 0; }
+.sri-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sri-lm { font-size: 12px; color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sri-dist { font-size: 12px; color: var(--blue); font-weight: 600; flex-shrink: 0; }
+
+/* ─── FAB CLUSTER ─── */
+.fab-cluster {
+  position: absolute;
+  right: 14px;
+  bottom: 130px;
+  z-index: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+.fab {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: none;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+}
+.fab:hover { box-shadow: var(--shadow-lg); transform: scale(1.05); }
+.fab:active { transform: scale(0.93); }
+.fab.primary {
+  width: 56px; height: 56px;
+  background: var(--blue);
+  color: white;
+  font-size: 22px;
+}
+.fab.green { background: var(--green); color: white; }
+
+/* ─── WEATHER TAB ─── */
+.weather-tab {
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 16px 20px 24px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.weather-current {
+  background: linear-gradient(145deg, #1a73e8, #0d47a1);
+  color: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.weather-current-icon {
+  font-size: 64px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+
+.weather-current-temp {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.weather-current-desc {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.weather-farming-tip {
+  background: var(--green-light);
+  border-left: 4px solid var(--green);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.weather-farming-tip-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.weather-farming-tip-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.weather-days {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  scrollbar-width: none;
+}
+
+.weather-days::-webkit-scrollbar {
+  display: none;
+}
+
+.weather-day-card {
+  flex: 0 0 auto;
+  width: 100px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+
+.weather-day-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.weather-day-icon {
+  font-size: 32px;
+  margin: 8px 0;
+}
+
+.weather-day-temp {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.weather-day-rain {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.weather-sun-times {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 16px 0;
+  display: flex;
+  justify-content: space-around;
+  border: 1px solid var(--border);
+}
+
+.weather-sun-item {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weather-sun-icon {
+  font-size: 24px;
+}
+
+.weather-sun-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.weather-sun-time {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.weather-alert {
+  background: var(--yellow-light);
+  border: 1px solid var(--yellow);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.weather-alert-icon {
+  font-size: 24px;
+}
+
+.weather-alert-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #b06000;
+  flex: 1;
+}
+
+/* Weather button in FAB cluster */
+.fab.weather {
+  background: var(--purple);
+  color: white;
+}
+
+/* ─── BOTTOM SHEET ─── */
+.bottom-sheet {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+.bottom-sheet-inner {
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+  pointer-events: all;
+  transform: translateY(0);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 10px auto 0;
+}
+
+/* ─── PLACE DETAIL SHEET ─── */
+.place-sheet { padding: 0 0 20px; }
+.place-header {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--surface-3);
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.place-icon-wrap {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+.place-title { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.place-cat { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+.place-landmark-desc {
+  padding: 12px 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  border-bottom: 1px solid var(--surface-3);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.place-landmark-desc span { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.place-actions {
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.place-actions::-webkit-scrollbar { display: none; }
+.place-action-btn {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 72px;
+}
+.place-action-btn:hover { background: var(--blue-light); }
+.place-action-btn:active { transform: scale(0.95); }
+.place-action-btn .pab-icon { font-size: 20px; }
+.place-action-btn.red { color: var(--red); }
+.place-action-btn.red:hover { background: var(--red-light); }
+
+/* ─── NAVIGATION PANEL ─── */
+.nav-panel {
+  padding: 16px 20px 20px;
+}
+.nav-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.nav-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
+.nav-stop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--surface-3);
+}
+.nav-stop:last-of-type { border-bottom: none; }
+.nav-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.nav-dot.start { background: var(--green); }
+.nav-dot.end { background: var(--red); }
+.nav-stop-label { font-size: 14px; flex: 1; }
+.nav-stop-label span { display: block; font-size: 11px; color: var(--text-hint); margin-top: 1px; }
+.nav-line { width: 2px; height: 20px; background: var(--border); margin: 0 4px; }
+.nav-summary {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0 0;
+  background: var(--blue-light);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.nav-stat { flex: 1; text-align: center; }
+.nav-stat-val { font-size: 20px; font-weight: 700; color: var(--blue); }
+.nav-stat-lbl { font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-weight: 500; }
+
+/* ─── STEP-BY-STEP DIRECTIONS ─── */
+.dir-steps { margin-top: 4px; }
+.dir-step {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--surface-3);
+  align-items: flex-start;
+}
+.dir-step:last-child { border-bottom: none; }
+.dir-step-num {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.dir-step-text { font-size: 13px; line-height: 1.5; color: var(--text-primary); }
+.dir-step-sub { font-size: 11px; color: var(--blue); font-weight: 600; margin-top: 2px; }
+
+/* ─── SHARE SHEET ─── */
+.share-panel { padding: 16px 20px 24px; }
+.share-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.share-panel p { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
+.share-link-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--blue);
+  word-break: break-all;
+  margin-bottom: 12px;
+}
+.share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.share-opt {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: all 0.15s;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.share-opt:hover { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
+.share-opt span { font-size: 22px; }
+
+/* ─── SUBMIT EDIT PANEL ─── */
+.edit-panel { padding: 16px 20px 24px; overflow-y: auto; max-height: 60vh; }
+.edit-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.edit-panel p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+.field-group { margin-bottom: 14px; }
+.field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  display: block;
+}
+.field-input, .field-textarea, .field-select {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.field-input:focus, .field-textarea:focus, .field-select:focus {
+  border-color: var(--blue);
+  background: white;
+}
+.field-textarea { resize: vertical; min-height: 75px; }
+.field-hint { font-size: 11px; color: var(--text-hint); margin-top: 4px; line-height: 1.5; }
+
+.cat-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cat-chip {
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border);
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+  transition: all 0.15s;
+}
+.cat-chip.sel { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
+
+.submit-btn {
+  width: 100%;
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 15px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background 0.2s;
+  letter-spacing: 0.2px;
+}
+.submit-btn:active { background: var(--blue-dark); transform: scale(0.98); }
+
+/* ─── ADMIN PANEL ─── */
+.admin-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32,33,36,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: none;
+  align-items: flex-end;
+}
+.admin-overlay.open { display: flex; }
+.admin-sheet {
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-height: 90dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.28s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.admin-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.admin-header h2 { font-size: 17px; font-weight: 700; flex: 1; }
+.admin-badge {
+  background: var(--blue);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.3px;
+}
+.admin-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.admin-tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.admin-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.admin-body { flex: 1; overflow-y: auto; padding: 14px 16px 24px; }
+
+.pending-card {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+.pending-card:hover { box-shadow: var(--shadow-sm); }
+.pc-header {
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--surface-3);
+}
+.pc-icon { font-size: 24px; flex-shrink: 0; }
+.pc-meta { flex: 1; min-width: 0; }
+.pc-name { font-size: 14px; font-weight: 700; }
+.pc-lm { font-size: 12px; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; }
+.pc-time { font-size: 11px; color: var(--text-hint); margin-top: 4px; }
+.pc-actions { display: flex; border-top: 1px solid var(--surface-3); }
+.pc-btn {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pc-btn.approve { color: var(--green); }
+.pc-btn.approve:hover { background: var(--green-light); }
+.pc-btn.reject { color: var(--red); }
+.pc-btn.reject:hover { background: var(--red-light); }
+.pc-btn:first-child { border-right: 1px solid var(--surface-3); }
+
+.live-card {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lc-icon { font-size: 22px; flex-shrink: 0; }
+.lc-body { flex: 1; min-width: 0; }
+.lc-name { font-size: 13px; font-weight: 600; }
+.lc-cat { font-size: 11px; color: var(--text-secondary); }
+.lc-del {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.lc-del:hover { background: var(--red); color: white; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-hint);
+}
+.empty-state-icon { font-size: 40px; margin-bottom: 10px; }
+.empty-state-text { font-size: 14px; font-weight: 500; }
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+}
+.status-pill.pending { background: var(--yellow-light); color: #b06000; }
+.status-pill.approved { background: var(--green-light); color: #0a7a3e; }
+.status-pill.rejected { background: var(--red-light); color: var(--red); }
+
+/* ─── MODALS ─── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32,33,36,0.55);
+  backdrop-filter: blur(3px);
+  z-index: 3000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 380px;
+  overflow: hidden;
+  animation: popIn 0.22s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: var(--shadow-lg);
+}
+@keyframes popIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.modal-box-inner { padding: 24px; }
+.modal-box-inner h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.modal-box-inner p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--radius-pill);
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.modal-btn.secondary { background: var(--surface-3); color: var(--text-primary); }
+.modal-btn.primary { background: var(--blue); color: white; }
+.modal-btn:active { transform: scale(0.97); }
+
+/* ─── LOCATION SHARE BANNER ─── */
+.share-banner {
+  position: absolute;
+  top: 74px; left: 12px; right: 12px;
+  z-index: 750;
+  background: var(--green);
+  color: white;
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  font-weight: 600;
+  animation: slideDown 0.25s ease;
+}
+.share-banner.show { display: flex; }
+@keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.share-banner-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #80e0b0;
+  flex-shrink: 0;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.3); } }
+
+/* ─── NAV PROGRESS BAR (active route) ─── */
+.nav-progress {
+  position: absolute;
+  top: 72px; left: 12px; right: 12px;
+  z-index: 750;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 12px 16px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+.nav-progress.show { display: flex; }
+.nav-progress-info { flex: 1; }
+.nav-progress-dest { font-size: 14px; font-weight: 700; }
+.nav-progress-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.nav-progress-btn {
+  background: var(--red-light);
+  color: var(--red);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+
+/* ─── TOAST ─── */
+.toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--text-primary);
+  color: white;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.25s;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90vw;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── ADD PLACE MAP HINT ─── */
+.map-hint {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 600;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.map-hint.show { display: flex; }
+.map-hint-cross { font-size: 40px; color: var(--blue); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+.map-hint-label {
+  background: var(--text-primary);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+}
+
+/* ─── RESPONSIVE ─── */
+@media (min-width: 600px) {
+  .top-bar { left: 20px; right: 20px; max-width: 480px; }
+  .bottom-sheet-inner { max-width: 480px; margin: 0 auto; }
+  .fab-cluster { right: 20px; }
+  .map-logo { left: 20px; }
+  .share-banner, .nav-progress { max-width: 540px; left: 50%; transform: translateX(-50%); right: auto; }
+}
+
+/* Leaflet routing styles */
+.leaflet-routing-container { display: none !important; }
+
+/* ─── MARKET DAY BANNER ─── */
+.market-day-pill {
+  position: absolute;
+  top: 130px; left: 12px;
+  z-index: 790;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md);
+  padding: 7px 14px 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: box-shadow 0.2s;
+  max-width: calc(100vw - 80px);
+}
+.market-day-pill:hover { box-shadow: var(--shadow-lg); }
+.market-day-pill.big-market  { border-color: var(--green);  background: var(--green-light);  color: #0a7a3e; }
+.market-day-pill.small-market{ border-color: var(--yellow); background: var(--yellow-light); color: #8a5a00; }
+.market-day-pill.no-farm     { border-color: var(--purple); background: #f3e8ff;             color: #5a1e8c; }
+.market-day-pill.regular     { border-color: var(--border);  background: var(--surface);     color: var(--text-secondary); }
+.market-day-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; background: var(--text-hint); }
+.market-day-pill.big-market   .market-day-dot { background: var(--green); }
+.market-day-pill.small-market .market-day-dot { background: var(--yellow); }
+.market-day-pill.no-farm      .market-day-dot { background: var(--purple); }
+
+/* ─── NOTICE FAB ─── */
+.notice-fab-wrap {
+  position: absolute;
+  left: 14px; bottom: 190px;
+  z-index: 700;
+}
+.notice-dot {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--red);
+  border: 2px solid white;
+  display: none;
+}
+.notice-dot.show { display: block; }
+
+/* ─── LOGO (bottom center, subtle) ─── */
+.map-logo {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  background: rgba(255,255,255,0.75);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-hint);
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.map-logo-dot { width:6px; height:6px; border-radius:50%; background: var(--teal); }
+
+/* ─── MARKET CALENDAR SHEET ─── */
+.market-sheet { padding: 16px 20px 28px; }
+.market-day-row {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 14px; border-radius:var(--radius);
+  margin-bottom:6px; border:1.5px solid var(--border);
+  background:var(--surface-2);
+}
+.market-day-row.today  { border-color:var(--blue);   background:var(--blue-light); }
+.market-day-row.big    { border-color:var(--green);  background:var(--green-light); }
+.market-day-row.small  { border-color:var(--yellow); background:var(--yellow-light); }
+.market-day-row.nofarm { border-color:var(--purple); background:#f3e8ff; }
+.mdr-icon { font-size:22px; flex-shrink:0; }
+.mdr-body { flex:1; }
+.mdr-name { font-size:14px; font-weight:700; }
+.mdr-desc { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.mdr-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:var(--radius-pill); flex-shrink:0; }
+.mdr-badge.today-badge { background:var(--blue); color:white; }
+.mdr-countdown { font-size:12px; font-weight:600; color:var(--blue); flex-shrink:0; }
+
+/* ─── NOTICE SHEET ─── */
+.notice-sheet { padding:16px 20px 28px; }
+.notice-card {
+  background:var(--surface-2); border:1.5px solid var(--border);
+  border-radius:var(--radius); padding:14px; margin-bottom:10px;
+}
+.notice-card.urgent { border-color:var(--red);   background:var(--red-light); }
+.notice-card.info   { border-color:var(--blue);  background:var(--blue-light); }
+.notice-card.event  { border-color:var(--green); background:var(--green-light); }
+.notice-title { font-size:14px; font-weight:700; margin-bottom:4px; }
+.notice-body  { font-size:13px; color:var(--text-secondary); line-height:1.5; }
+.notice-meta  { font-size:11px; color:var(--text-hint); margin-top:8px; }
+.notice-expires { color:var(--red); font-weight:600; }
+.notice-type-pill {
+  display:inline-block; font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:var(--radius-pill);
+  text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;
+}
+.notice-type-pill.urgent { background:var(--red);   color:white; }
+.notice-type-pill.info   { background:var(--blue);  color:white; }
+.notice-type-pill.event  { background:var(--green); color:white; }
+
+/* ─── ZONE LABELS ─── */
+.zone-label { background:transparent!important; border:none!important; box-shadow:none!important; }
+.zone-label-inner {
+  font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700;
+  letter-spacing:1.2px; text-transform:uppercase; color:rgba(55,71,79,0.72);
+  text-shadow:0 1px 3px rgba(255,255,255,0.95),0 -1px 3px rgba(255,255,255,0.95),
+              1px 0 3px rgba(255,255,255,0.95),-1px 0 3px rgba(255,255,255,0.95);
+  white-space:nowrap; pointer-events:none; user-select:none;
+}
+
+/* ─── LANDMARK DIRECTIONS ─── */
+.lm-directions {
+  background:var(--green-light); border:1.5px solid var(--green);
+  border-radius:var(--radius); padding:14px 16px; margin-top:12px;
+}
+.lm-directions-title {
+  font-size:11px; font-weight:700; letter-spacing:0.8px;
+  text-transform:uppercase; color:var(--green); margin-bottom:10px;
+}
+.lm-dir-step { display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid rgba(15,157,88,0.15); }
+.lm-dir-step:last-child { border-bottom:none; padding-bottom:0; }
+.lm-dir-num {
+  width:22px; height:22px; border-radius:50%; background:var(--green); color:white;
+  font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; margin-top:1px;
+}
+.lm-dir-text { font-size:13px; line-height:1.5; color:var(--text-primary); }
+
+/* ─── SEASONAL FARMLAND ─── */
+.season-banner {
+  background:linear-gradient(135deg,#1b5e20,#2e7d32); color:white;
+  border-radius:var(--radius); padding:14px 16px; margin-bottom:12px;
+  display:flex; align-items:center; gap:14px;
+}
+.season-icon { font-size:36px; flex-shrink:0; }
+.season-name { font-size:15px; font-weight:700; }
+.season-desc { font-size:12px; opacity:0.88; margin-top:3px; line-height:1.5; }
+.crop-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.crop-card {
+  background:var(--surface-2); border:1.5px solid var(--border);
+  border-radius:var(--radius); padding:12px;
+  display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
+}
+.crop-card.active  { border-color:var(--green);  background:var(--green-light); }
+.crop-card.harvest { border-color:var(--yellow); background:var(--yellow-light); }
+.crop-icon   { font-size:26px; }
+.crop-name   { font-size:12px; font-weight:700; }
+.crop-status { font-size:11px; color:var(--text-secondary); }
+</style>
+</head>
+
+<body>
+<!-- Admin Password Modal (hidden by default) -->
+<div id="adminPasswordModal" style="display:none;"></div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- MAP CROSSHAIR for pin drop -->
+<div class="map-hint" id="mapHint">
+  <div class="map-hint-cross">＋</div>
+  <div class="map-hint-label">Move map then tap Confirm</div>
+</div>
+
+<!-- MARKET DAY PILL -->
+<div class="market-day-pill regular" id="marketDayPill" onclick="showMarketCalendar()">
+  <div class="market-day-dot" id="marketDayDot"></div>
+  <span id="marketDayText">Loading…</span>
+</div>
+
+<!-- NOTICE FAB -->
+<div class="notice-fab-wrap">
+  <button class="fab" style="background:#ffffff;color:white;" title="Community Notices" onclick="showNoticeBoard()">📢</button>
+  <div class="notice-dot" id="noticeDot"></div>
+</div>
+
+<!-- LOGO (bottom center, subtle) -->
+<div class="map-logo" style="background: rgba(255,255,255,0.9); padding: 6px 16px; gap: 8px;">
+  <div class="map-logo-dot"></div>
+  <span>Leteh Nav Sys by</span>
+  <img src="https://sntechpros.com/wp-content/uploads/2025/12/SN-Tech-Pros-web-designer-logo-clear.png" 
+       alt="SN Tech Pros" 
+       style="height: 18px; width: auto; margin-left: 2px;">
+</div>
+
+<!-- SHARE LOCATION BANNER -->
+<div class="share-banner" id="shareBanner">
+  <div class="share-banner-dot"></div>
+  <span id="shareBannerText">Sharing your location…</span>
+  <button class="icon-btn" onclick="stopSharing()" style="margin-left:auto;color:white;font-size:16px;">✕</button>
+</div>
+
+<!-- ACTIVE NAV PROGRESS -->
+<div class="nav-progress" id="navProgress">
+  <div style="font-size:22px;">🧭</div>
+  <div class="nav-progress-info">
+    <div class="nav-progress-dest" id="navProgressDest">–</div>
+    <div class="nav-progress-sub" id="navProgressSub">–</div>
+  </div>
+  <button class="nav-progress-btn" onclick="stopNavigation()">End</button>
+</div>
+
+<!-- TOP SEARCH BAR -->
+<div class="top-bar">
+  <div class="search-pill">
+    <div class="search-pill-icon">🔍</div>
+    <input type="search" id="searchInput" placeholder="Search places on the map…" 
+      oninput="onSearchInput(this.value)" onfocus="onSearchFocus()" onblur="onSearchBlur()">
+    <div class="search-pill-actions">
+      <button class="icon-btn" title="My Location" onclick="locateMe()">📍</button>
+      <button class="icon-btn" title="Admin" onclick="openAdmin()">⚙️</button>
+    </div>
+  </div>
+  <div class="category-chips" id="categoryChips">
+    <button class="chip active" data-cat="all" onclick="filterCat(this,'all')">🗺️ All</button>
+    <button class="chip" data-cat="health" onclick="filterCat(this,'health')">🩺 Health</button>
+    <button class="chip" data-cat="water" onclick="filterCat(this,'water')">💧 Water</button>
+    <button class="chip" data-cat="market" onclick="filterCat(this,'market')">🛒 Market</button>
+    <button class="chip" data-cat="church" onclick="filterCat(this,'church')">⛪ Church</button>
+    <button class="chip" data-cat="home" onclick="filterCat(this,'home')">🏡 Home/Residence/Compound</button>
+    <button class="chip" data-cat="school" onclick="filterCat(this,'school')">📚 School</button>
+    <button class="chip" data-cat="landmark" onclick="filterCat(this,'landmark')">🏛️ Landmark</button>
+    <button class="chip" data-cat="preschool" onclick="filterCat(this,'preschool')">🚸 Pre-School</button>
+    <button class="chip" data-cat="primaryschool" onclick="filterCat(this,'primaryschool')">🎒 Primary School</button>
+    <button class="chip" data-cat="farmland" onclick="filterCat(this,'farmland')">🌱 Farmland</button>
+    <button class="chip" data-cat="motorpark" onclick="filterCat(this,'motorpark')">🚗 Motorpark</button>
+    <button class="chip" data-cat="palace" onclick="filterCat(this,'palace')">🏰 Palace</button>
+    <button class="chip" data-cat="finacialinstitution" onclick="filterCat(this,'finacialinstitution')">💰 Financial Institution</button>
+    <button class="chip" data-cat="touristicsite" onclick="filterCat(this,'touristicsite')">📸 Touristic Site</button>
+    <button class="chip" data-cat="notice" onclick="filterCat(this,'notice')">📢 Notices</button>
+  </div>
+  <div class="search-dropdown" id="searchDropdown"></div>
+</div>
+
+<!-- FAB CLUSTER -->
+<div class="fab-cluster">
+  <button class="fab" title="Zoom In" onclick="map.zoomIn()">+</button>
+  <button class="fab" title="Zoom Out" onclick="map.zoomOut()">−</button>
+  <button class="fab primary" title="Add Place" onclick="startAddPlace()" style="background:#237f7e;">＋</button>
+  <button class="fab green" title="Add from My Location" onclick="addFromCurrentLocation()" style="background:#ffffff;">📍</button>
+  <button class="fab weather" title="Weather Forecast" onclick="showWeather()" style="background:#ffffff;">🌤️</button>
+  <button class="fab" title="Farming Calendar" onclick="showSeasonalFarmland()" style="background:#ffffff;color:white;">🌾</button>
+</div>
+
+<!-- BOTTOM SHEET -->
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="bottom-sheet-inner" id="sheetInner">
+    <div class="sheet-handle"></div>
+    <!-- content injected here -->
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="admin-overlay" id="adminOverlay" onclick="closeAdminOutside(event)">
+  <div class="admin-sheet">
+    <div class="admin-header">
+      <div style="font-size:22px;">🔧</div>
+      <h2>Map Admin Panel</h2>
+      <div class="admin-badge">ADMIN</div>
+      <button class="icon-btn" onclick="closeAdmin()">✕</button>
+    </div>
+    <div class="admin-tabs">
+      <div class="admin-tab active" id="adminTab0" onclick="switchAdminTab(0)">Pending (<span id="pendingCount">0</span>)</div>
+      <div class="admin-tab" id="adminTab1" onclick="switchAdminTab(1)">Live Places</div>
+      <div class="admin-tab" id="adminTab2" onclick="switchAdminTab(2)">Settings</div>
+    </div>
+    <div class="admin-body" id="adminBody"></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <div class="modal-box-inner">
+      <h3 id="confirmTitle">Confirm</h3>
+      <p id="confirmMsg">Are you sure?</p>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" onclick="closeConfirm()">Cancel</button>
+        <button class="modal-btn primary" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- LEAFLET + ROUTING -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONSTANTS & CONFIG
+// ══════════════════════════════════════════════════════
+const HOME = [5.634999, 10.036081];
+const ZOOM = 15;
+
+const CAT_META = {
+  landmark: { icon: '🏛️', color: '#f5f5f5', label: 'Landmark',  bg: '#e8f0fe' },
+  health:   { icon: '🩺', color: '#ffffff', label: 'Health',    bg: '#fce8e6' },
+  market:     { icon: '🛒', color: '#aaface', label: 'Market',    bg: '#fef7e0' },
+  church:  { icon: '⛪', color: '#ffffff', label: 'Church',   bg: '#e4e4e4' },
+  school:   { icon: '🎓', color: '#ffffff', label: 'School',    bg: '#e6f4ea' },
+  preschool:   { icon: '🚸', color: '#ffffff', label: 'Pre-School',    bg: '#e6f4ea' },
+  primaryschool:   { icon: '🎒', color: '#ffffff', label: 'Primary School',    bg: '#e6f4ea' },
+  farmland:   { icon: '🌱', color: '#ffffff', label: 'Farmland',    bg: '#e6f4ea' },
+  motorpark:   { icon: '🚗', color: '#ffffff', label: 'Motorpark',    bg: '#e6f4ea' },
+  palace:  { icon: '🏰', color: '#fac8cb', label: 'Palace',    bg: '#e6f4ea' },
+  finacialinstitution:  { icon: '💰', color: '#ffffff', label: 'Financial Institution',    bg: '#e6f4ea' },
+  touristicsite:  { icon: '📸', color: '#ffffff', label: 'Touristic Site',    bg: '#e6f4ea' },
+  home: { icon: '🏡', color: '#f5f5f5', label: 'Home/Compound/Residence',  bg: '#e8f0fe' },
+  notice: { icon: '📢', color: '#fff3e0', label: 'Notice', bg: '#fff3e0' },
+};
+
+// ══════════════════════════════════════════════════════
+// DATA LAYER
+// ══════════════════════════════════════════════════════
+const SEED = [
+  { id:'s1', name:'Nkongle Market', cat:'market', lat:5.6349, lng:10.0359,
+    landmark:'Main gathering point — large open market, centre of town',
+    notes:'Daily 24/7', tags:['Produce','Daily goods'], status:'live' },
+  { id:'s2', name:'Government Bilingual Primary School Ntemndzem', cat:'primaryschool', lat:5.6217, lng:10.0316,
+    landmark:'Government School buildings. 300m from the Integrated Health Center towards the S\'hê-Ntsi\'hi river',
+    notes:'Mon–Fri 7am–3pm', tags:['Free consultations','Maternity'], status:'live' },
+  { id:'s4', name:'Divine Mercy Parish', cat:'church', lat:5.6316, lng:10.0352,
+    landmark:'Large white church building located 400m west of 3 corners on the Dschang road',
+    notes:'Mass: Sun 8am & 10am', tags:['Open daily','Catholic church','Place of worship','Spiritual center'], status:'live' },
+  { id:'s5', name:'Government Secondary School Mmuock Leteh', cat:'school', lat:5.6269, lng:10.03792,
+    landmark:'Secondary School compound with multiple buildings',
+    notes:'Seocondary school', tags:['Government school'], status:'live' },
+  { id:'s6', name:'Fon\'s Palace', cat:'palace', lat:5.6463, lng:10.0374,
+    landmark:'Palace with decorated entrance and several buildings. Visible from Kongho and most higher areas in Mmuock Leteh',
+    notes:'Community meetings here', tags:['Cultural landmark'], status:'live' },
+  { id:'s7', name:'3 Corners', cat:'motorpark', lat:5.6344, lng:10.0369,
+    landmark:'Main crossroads where the Dschang road meets Mmuock Leteh village center by way of S\'hê-Ntsi\'hi',
+    notes:'Road junction, car park', tags:['Taxis','Motos','Car Park'], status:'live' },
+  { id:'s8', name:'Catholic Hospital', cat:'health', lat:5.6305, lng:10.0414,
+    landmark:'Yellow building with red roof, located 1.2km east of the market on the Dschang road',
+    notes:'Daily 24/7', tags:['Healthcare','Medicines'], status:'live' },
+  { id:'s9', name:'St. John Paul II College', cat:'school', lat:5.6301, lng:10.0418,
+    landmark:'College, located 80m from the Catholic Hospital on the Dschang road',
+    notes:'Daily 24/7', tags:['School','college','education'], status:'live' },
+  { id:'s10', name:'Catholic School Leteh', cat:'primaryschool', lat:5.6291, lng:10.0398,
+    landmark:'Primary School with multiple buildings',
+    notes:'Mon-Fri', tags:['School','education'], status:'live' },
+  { id:'s11', name:'Agric Post', cat:'farmland', lat:5.6309, lng:10.0344,
+    landmark:'Agricultural post in the farmland area',
+    notes:'Mon-Fri', tags:['Agriculture','Seeds','plant nursery'], status:'live' },
+  { id:'s12', name:'Government Technical College Ntemndzem', cat:'school', lat:5.6297, lng:10.0338,
+    landmark:'GTTC school compound with multiple buildings, located on Dschang road about 1.5km from the market',
+    notes:'Free. Operational 24h', tags:['CETIC','GTTC','Technical School'], status:'live' },
+  { id:'s13', name:'Government Technical College Ntemndzem', cat:'preschool', lat:5.6305, lng:10.0340,
+    landmark:'Government nursery school, located on S\'hê-Ntsi\'hi near GTTC (CETIC de Ntemndzem)',
+    notes:'Mon-Fri except on holidays', tags:['Education','Nursery School'], status:'live' },
+  { id:'s14', name:'Mmuock Leteh Cooperative Credit Union', cat:'finacialinstitution', lat:5.6339, lng:10.0370,
+    landmark:'Located at 3 corners Ntemndzem, across from the market towards S\'hê-Ntsi\'hi',
+    notes:'Open Mon-Fri 8am-4pm. Offers savings and loans', tags:['Finance','MULECCUL'], status:'live' },
+  { id:'s15', name:'Fotang Integrated Health Centre', cat:'health', lat:5.6265, lng:10.0323,
+    landmark:'Large H-shaped building on S\'hê-Ntsi\'hi',
+    notes:'Operational 24h', tags:['Healthcare','Medical Center','Hospital'], status:'live' },
+  { id:'s16', name:'Welcome To Mmuock Leteh Mural', cat:'touristicsite', lat:5.609473420012446, lng:10.035281119026351,
+    landmark:'Concrete mural at the entrance to Mmuock Leteh from Dschang, painted with "Welcome to Mmuock Leteh" and colorful patterns',
+    notes:'Photo spot', tags:['Mural','Welcome'], status:'live' },
+  { id:'s17', name:'Marché A', cat:'market', lat:5.6349, lng:10.0409,
+    landmark:'Small roadside market with a few stalls, located about 600m from the main market towards Maleta',
+    notes:'Open Daily at unspecified times', tags:['Market','Produce'], status:'live' },
+  { id:'s18', name:'Government Nursery School Maleta', cat:'preschool', lat:5.6352, lng:10.07835,
+    landmark:'Located in Maleta on the right side of the road about 5km from Nkongle market',
+    notes:'Mon-Fri except on holidays', tags:['Education','Nursery School'], status:'live' },
+  { id:'s19', name:'Government Primary School Maleta', cat:'primaryschool', lat:5.6358, lng:10.0784,
+    landmark:'Located in Maleta on the right side of the road about 5km from Nkongle market, just before the nursery school',
+    notes:'Mon-Fri except on holidays', tags:['Education','Primary School'], status:'live' },
+  { id:'s20', name:'Government School Fotang', cat:'primaryschool', lat:5.6624, lng:10.0360,
+    landmark:'Located in Belang Fotang, about 3km from Nkongle market',
+    notes:'Mon-Fri except on holidays', tags:['Education','Primary School'], status:'live' },
+  { id:'s21', name:"Pa Taa Laman's Residence", cat:'home', lat:5.63442, lng:10.03615,
+    landmark:'A private residence located few meters from the market.',
+    notes:'Private residence, not open to the public', tags:['Home','Residence','Compound'], status:'live' },
+  { id:'n2', name:'Community Meeting at the Palace', cat:'notice', lat:5.6463, lng:10.0364,
+    landmark:"Fon's Palace — main hall",
+    notes:"All community members are invited to a meeting at the Fon's Palace. Topic: Village development plans for 2026.",
+    tags:['Meeting','Community'], noticeType:'event', expiresAt:'2026-02-22', status:'live' },
+];
+
+let landmarks = [];
+let pendingEdits = [];
+let currentCat = 'all';
+let activeModal = null;
+let routingControl = null;
+let userMarker = null;
+let userLocation = null;
+let sharingInterval = null;
+let pickingMode = false;
+let pendingAdd = {};
+let activeAdminTab = 0;
+
+function loadData() {
+  try {
+    const stored = localStorage.getItem('mmuock_landmarks');
+    const version = localStorage.getItem('mmuock_version');
+    if (!version || version !== 'v1') {
+      landmarks = [...SEED];
+      localStorage.setItem('mmuock_version', 'v1');
+    } else {
+      landmarks = stored ? JSON.parse(stored) : [...SEED];
+    }
+    const pe = localStorage.getItem('mmuock_pending');
+    pendingEdits = pe ? JSON.parse(pe) : [];
+  } catch(e) {
+    landmarks = [...SEED];
+    pendingEdits = [];
+  }
+}
+function saveData() {
+  localStorage.setItem('mmuock_landmarks', JSON.stringify(landmarks));
+  localStorage.setItem('mmuock_pending', JSON.stringify(pendingEdits));
+}
+function liveLandmarks() {
+  return landmarks.filter(l => l.status === 'live');
+}
+
+// ══════════════════════════════════════════════════════
+// MAP INIT
+// ══════════════════════════════════════════════════════
+let map;
+
+function initMap() {
+  map = L.map('map', {
+    center: HOME, zoom: ZOOM,
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    subdomains: ['a','b'],
+    crossOrigin: true,
+  }).addTo(map);
+
+  L.control.attribution({ prefix: '<a href="https://osm.org">© OpenStreetMap</a>' }).addTo(map);
+
+  map.on('click', onMapClick);
+  renderAllMarkers();
+  renderZoneLabels();
+  initMarketDayBanner();
+}
+
+function mkIcon(cat) {
+  const m = CAT_META[cat] || CAT_META.landmark;
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      background:${m.color};width:38px;height:38px;
+      border-radius:50% 50% 50% 4px;
+      transform:rotate(-45deg);
+      border:3px solid white;
+      box-shadow:0 3px 10px rgba(0,0,0,0.25);
+      display:flex;align-items:center;justify-content:center;
+      font-size:17px;
+    "><span style="transform:rotate(45deg)">${m.icon}</span></div>`,
+    iconSize:[38,38], iconAnchor:[19,38], popupAnchor:[0,-40]
+  });
+}
+
+const markerMap = {}; // id → leaflet marker
+
+function renderAllMarkers() {
+  Object.values(markerMap).forEach(m => map.removeLayer(m));
+  Object.keys(markerMap).forEach(k => delete markerMap[k]);
+
+  liveLandmarks().forEach(lm => {
+    if (currentCat !== 'all' && lm.cat !== currentCat) return;
+    const marker = L.marker([lm.lat, lm.lng], { icon: mkIcon(lm.cat) });
+    const m = CAT_META[lm.cat] || CAT_META.landmark;
+    marker.bindPopup(`
+      <div style="padding:10px;min-width:170px;">
+        <div style="font-weight:700;font-size:14px;">${m.icon} ${lm.name}</div>
+        <div style="font-size:12px;color:#5f6368;margin:4px 0 10px;line-height:1.5;">
+          ${lm.landmark.substring(0,90)}${lm.landmark.length>90?'…':''}
+        </div>
+        <button onclick="openPlaceSheet('${lm.id}')"
+          style="background:#1a73e8;color:white;border:none;border-radius:20px;
+          padding:7px 16px;font-size:12px;font-weight:700;width:100%;cursor:pointer;
+          font-family:'DM Sans',sans-serif;">
+          Details & Navigate
+        </button>
+      </div>
+    `, { maxWidth: 220 });
+    marker.on('click', () => openPlaceSheet(lm.id));
+    marker.addTo(map);
+    markerMap[lm.id] = marker;
+  });
+}
+
+function onMapClick(e) {
+  if (pickingMode) {
+    pendingAdd.lat = e.latlng.lat;
+    pendingAdd.lng = e.latlng.lng;
+    stopPickMode();
+    showEditSheet(pendingAdd);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════════════════
+let searchTimer;
+function onSearchInput(val) {
+  clearTimeout(searchTimer);
+  if (!val.trim()) { closeDropdown(); return; }
+  searchTimer = setTimeout(() => showDropdown(val.trim()), 200);
+}
+function onSearchFocus() {
+  const v = document.getElementById('searchInput').value.trim();
+  if (v) showDropdown(v);
+}
+function onSearchBlur() { setTimeout(closeDropdown, 200); }
+function closeDropdown() {
+  document.getElementById('searchDropdown').classList.remove('open');
+}
+
+function showDropdown(q) {
+  const lcase = q.toLowerCase();
+  const matches = liveLandmarks().filter(lm =>
+    lm.name.toLowerCase().includes(lcase) ||
+    lm.landmark.toLowerCase().includes(lcase) ||
+    (lm.notes||'').toLowerCase().includes(lcase) ||
+    (lm.tags||[]).join(' ').toLowerCase().includes(lcase)
+  ).slice(0, 8);
+
+  const dd = document.getElementById('searchDropdown');
+  if (!matches.length) { dd.innerHTML = `<div style="padding:16px;text-align:center;color:#9aa0a6;font-size:13px;">No results found</div>`; }
+  else {
+    dd.innerHTML = matches.map(lm => {
+      const m = CAT_META[lm.cat] || CAT_META.landmark;
+      const dist = userLocation ? ' · ' + fmtDist(haversine(userLocation[0],userLocation[1],lm.lat,lm.lng)) : '';
+      return `<div class="search-result-item" onclick="selectSearchResult('${lm.id}')">
+        <div class="sri-icon" style="background:${m.bg}">${m.icon}</div>
+        <div class="sri-body">
+          <div class="sri-name">${lm.name}</div>
+          <div class="sri-lm">${lm.landmark.substring(0,60)}…</div>
+        </div>
+        <div class="sri-dist">${dist}</div>
+      </div>`;
+    }).join('');
+  }
+  dd.classList.add('open');
+}
+
+function selectSearchResult(id) {
+  closeDropdown();
+  document.getElementById('searchInput').value = '';
+  const lm = landmarks.find(l => l.id === id);
+  if (!lm) return;
+  map.setView([lm.lat, lm.lng], 17, { animate: true });
+  setTimeout(() => { if (markerMap[id]) markerMap[id].openPopup(); }, 350);
+  openPlaceSheet(id);
+}
+
+// ══════════════════════════════════════════════════════
+// CATEGORY FILTER
+// ══════════════════════════════════════════════════════
+function filterCat(btn, cat) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  currentCat = cat;
+  renderAllMarkers();
+  hideSheet();
+}
+
+// ══════════════════════════════════════════════════════
+// BOTTOM SHEET
+// ══════════════════════════════════════════════════════
+function showSheet(html) {
+  const inner = document.getElementById('sheetInner');
+  inner.innerHTML = `<div class="sheet-handle"></div>${html}`;
+  document.getElementById('bottomSheet').style.display = 'block';
+}
+function hideSheet() {
+  document.getElementById('bottomSheet').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════
+// PLACE DETAIL SHEET
+// ══════════════════════════════════════════════════════
+function openPlaceSheet(id) {
+  activeModal = landmarks.find(l => l.id === id);
+  if (!activeModal) return;
+  const lm = activeModal;
+  const m = CAT_META[lm.cat] || CAT_META.landmark;
+  const dist = userLocation
+    ? `<span style="font-size:13px;color:#0f9d58;font-weight:600;">📍 ${fmtDist(haversine(userLocation[0],userLocation[1],lm.lat,lm.lng))} away</span>`
+    : '';
+
+  // Extra action button for farmland
+  const farmBtn = lm.cat === 'farmland'
+    ? `<button class="place-action-btn" style="color:#2e7d32;" onclick="showSeasonalFarmland()"><div class="pab-icon">🌾</div>Seasons</button>`
+    : '';
+  // Notices don't need a navigate button
+  const navBtn = lm.cat === 'notice' ? '' :
+    `<button class="place-action-btn" onclick="startNavigateTo('${lm.id}')"><div class="pab-icon">🧭</div>Navigate</button>`;
+
+  showSheet(`
+    <div class="place-sheet">
+      <div class="place-header">
+        <div class="place-icon-wrap" style="background:${m.bg}">${m.icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="place-title">${lm.name}</div>
+          <div class="place-cat">${m.label} ${dist}</div>
+        </div>
+        <button class="icon-btn" onclick="hideSheet()" style="flex-shrink:0;">✕</button>
+      </div>
+      <div class="place-landmark-desc">
+        <span>📍</span>
+        <div>${lm.landmark}</div>
+      </div>
+      ${lm.notes ? `<div style="padding:10px 20px;font-size:13px;color:#5f6368;border-bottom:1px solid #f1f3f4;">ℹ️ ${lm.notes}</div>` : ''}
+      <div class="place-actions">
+        ${farmBtn}
+        ${navBtn}
+        <button class="place-action-btn" onclick="sharePlace('${lm.id}')">
+          <div class="pab-icon">📤</div>Share
+        </button>
+        <button class="place-action-btn" onclick="openShareLocationSheet()">
+          <div class="pab-icon">📍</div>My Location
+        </button>
+        <button class="place-action-btn" onclick="openEditSheet('${lm.id}')" style="color:#5f6368;">
+          <div class="pab-icon">✏️</div>Suggest Edit
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function startNavigateTo(destId) {
+  const dest = landmarks.find(l => l.id === destId);
+  if (!dest) return;
+  hideSheet();
+
+  if (!userLocation) {
+    showConfirm(
+      '📍 Location needed',
+      'To navigate, we need your GPS location. Tap "Enable" to share your location.',
+      'Enable GPS',
+      () => {
+        locateMe(() => buildRoute(dest));
+      }
+    );
+    return;
+  }
+  buildRoute(dest);
+}
+
+function buildRoute(dest) {
+  if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+
+  const start = L.latLng(userLocation[0], userLocation[1]);
+  const end = L.latLng(dest.lat, dest.lng);
+
+  routingControl = L.Routing.control({
+    waypoints: [start, end],
+    routeWhileDragging: false,
+    addWaypoints: false,
+    draggableWaypoints: false,
+    fitSelectedRoutes: true,
+    lineOptions: {
+      styles: [{ color: '#1a73e8', opacity: 0.9, weight: 6 }],
+      extendToWaypoints: true,
+      missingRouteTolerance: 0
+    },
+    createMarker: () => null,
+  }).addTo(map);
+
+  routingControl.on('routesfound', function(e) {
+    const route = e.routes[0];
+    const dist = fmtDist(route.summary.totalDistance);
+    const time = Math.ceil(route.summary.totalTime / 60) + ' min';
+
+    document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
+    document.getElementById('navProgressSub').textContent = `${dist} · Est. ${time}`;
+    document.getElementById('navProgress').classList.add('show');
+
+    showNavSheet(dest, route);
+  });
+
+  map.fitBounds([userLocation, [dest.lat, dest.lng]], { padding: [60, 60] });
+}
+
+function showNavSheet(dest, route) {
+  const m = CAT_META[dest.cat] || CAT_META.landmark;
+  const dist = fmtDist(route.summary.totalDistance);
+  const time = Math.ceil(route.summary.totalTime / 60);
+
+  const steps = (route.instructions || []).slice(0, 8).map((s, i) => `
+    <div class="dir-step">
+      <div class="dir-step-num">${i+1}</div>
+      <div>
+        <div class="dir-step-text">${s.text}</div>
+        ${s.distance > 5 ? `<div class="dir-step-sub">~${fmtDist(s.distance)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  const lmSteps = getLandmarkDirections(dest);
+  const lmHTML = lmSteps.length ? `
+    <div class="lm-directions">
+      <div class="lm-directions-title">🏘️ Local Landmark Guide</div>
+      ${lmSteps.map((s,i) => `
+        <div class="lm-dir-step">
+          <div class="lm-dir-num">${i+1}</div>
+          <div class="lm-dir-text">${s}</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  showSheet(`
+    <div class="nav-panel">
+      <div class="nav-header">
+        <span>${m.icon}</span>
+        <h3>Route to ${dest.name}</h3>
+        <button class="icon-btn" onclick="stopNavigation()">✕</button>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:14px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+          <div class="nav-dot start"></div>
+          <div class="nav-line"></div>
+          <div class="nav-dot end"></div>
+        </div>
+        <div style="flex:1;">
+          <div class="nav-stop" style="border:none;padding:0 0 12px;">
+            <div class="nav-stop-label">Your Location <span>Current position</span></div>
+          </div>
+          <div class="nav-stop" style="border:none;padding:0;">
+            <div class="nav-stop-label">${dest.name} <span>${dest.landmark.substring(0,50)}…</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-summary">
+        <div class="nav-stat"><div class="nav-stat-val">${dist}</div><div class="nav-stat-lbl">Distance</div></div>
+        <div class="nav-stat"><div class="nav-stat-val">${time}</div><div class="nav-stat-lbl">Minutes</div></div>
+        <div class="nav-stat"><div class="nav-stat-val">${m.icon}</div><div class="nav-stat-lbl">${m.label}</div></div>
+      </div>
+      ${lmHTML}
+      <div style="margin-top:14px;">
+        <div style="font-size:12px;font-weight:700;color:#5f6368;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Turn-by-Turn Directions</div>
+        <div class="dir-steps">
+          ${steps || `<div class="dir-step"><div class="dir-step-num">1</div><div><div class="dir-step-text">${dest.landmark}</div></div></div>`}
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function stopNavigation() {
+  if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+  document.getElementById('navProgress').classList.remove('show');
+  hideSheet();
+}
+
+// ══════════════════════════════════════════════════════
+// LOCATE ME
+// ══════════════════════════════════════════════════════
+function locateMe(callback) {
+  if (!navigator.geolocation) { showToast('GPS not available'); return; }
+  showToast('Finding your location…');
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLocation = [pos.coords.latitude, pos.coords.longitude];
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.circleMarker(userLocation, {
+      radius: 10, fillColor: '#1a73e8', color: 'white', weight: 3, fillOpacity: 1,
+    }).addTo(map).bindPopup('📍 You are here');
+    // Accuracy circle
+    L.circle(userLocation, {
+      radius: pos.coords.accuracy,
+      color: '#1a73e8', fillColor: '#1a73e8', fillOpacity: 0.08, weight: 1, dashArray: '4'
+    }).addTo(map);
+    map.setView(userLocation, 16, { animate: true });
+    showToast('✓ Location found');
+    if (callback) callback();
+  }, () => { showToast('Could not get location. Enable GPS.'); }, { timeout: 12000 });
+}
+
+// ══════════════════════════════════════════════════════
+// SHARE MY LOCATION
+// ══════════════════════════════════════════════════════
+function openShareLocationSheet() {
+  showSheet(`
+    <div class="share-panel">
+      <h3>📍 Share Your Location</h3>
+      <p>Let others find you on the map, or send a direct link to your current position.</p>
+      <div id="shareLocContent">
+        <button class="submit-btn" onclick="shareMyLocation()" style="margin-top:0;">
+          📍 Get My Location & Share
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+function shareMyLocation() {
+  if (!navigator.geolocation) { showToast('GPS not available'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLocation = [pos.coords.latitude, pos.coords.longitude];
+    const lat = pos.coords.latitude.toFixed(6);
+    const lng = pos.coords.longitude.toFixed(6);
+    const shareUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=17`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent('My location: ' + shareUrl)}`;
+    const smsUrl = `sms:?body=${encodeURIComponent('My location: ' + shareUrl)}`;
+
+    document.getElementById('shareLocContent').innerHTML = `
+      <div class="share-link-box">${shareUrl}</div>
+      <div class="share-grid">
+        <button class="share-opt" onclick="navigator.clipboard&&navigator.clipboard.writeText('${shareUrl}');showToast('Link copied!')">
+          <span>📋</span>Copy Link
+        </button>
+        <button class="share-opt" onclick="window.open('${waUrl}','_blank')">
+          <span>💬</span>WhatsApp
+        </button>
+        <button class="share-opt" onclick="window.open('${smsUrl}')">
+          <span>📱</span>SMS
+        </button>
+        <button class="share-opt" onclick="startLiveShare(${lat},${lng})">
+          <span>🔴</span>Live Share
+        </button>
+        <button class="share-opt" onclick="addFromCurrentLocation()" style="grid-column:span 2;background:#e8f0fe;border-color:#1a73e8;">
+          <span>➕</span>Add Place Here
+        </button>
+      </div>
+      <p style="margin-top:12px;font-size:12px;color:#9aa0a6;line-height:1.5;">
+        📌 Coordinates: ${lat}, ${lng}
+      </p>
+    `;
+  }, () => { showToast('Enable GPS to share location'); });
+}
+
+function sharePlace(id) {
+  const lm = landmarks.find(l => l.id === id);
+  if (!lm) return;
+  const url = `https://www.openstreetmap.org/?mlat=${lm.lat}&mlon=${lm.lng}&zoom=17`;
+  const text = `${lm.name} – ${lm.landmark} | Leteh Navigation`;
+  showSheet(`
+    <div class="share-panel">
+      <h3>📤 Share: ${lm.name}</h3>
+      <p>${lm.landmark}</p>
+      <div class="share-link-box">${url}</div>
+      <div class="share-grid">
+        <button class="share-opt" onclick="navigator.clipboard&&navigator.clipboard.writeText('${url}');showToast('Copied!')">
+          <span>📋</span>Copy Link
+        </button>
+        <button class="share-opt" onclick="window.open('https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}','_blank')">
+          <span>💬</span>WhatsApp
+        </button>
+        <button class="share-opt" onclick="window.open('sms:?body=${encodeURIComponent(text + ' ' + url)}')">
+          <span>📱</span>SMS
+        </button>
+        <button class="share-opt" onclick="map.setView([${lm.lat},${lm.lng}],17);hideSheet()">
+          <span>🗺️</span>Show Map
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+function startLiveShare(lat, lng) {
+  hideSheet();
+  const banner = document.getElementById('shareBanner');
+  const txt = document.getElementById('shareBannerText');
+  banner.classList.add('show');
+  txt.textContent = 'Sharing your live location…';
+  if (sharingInterval) clearInterval(sharingInterval);
+  let count = 0;
+  sharingInterval = setInterval(() => {
+    count++;
+    txt.textContent = `Live location shared · ${count}s ago`;
+  }, 1000);
+  showToast('Live location sharing started');
+}
+
+function stopSharing() {
+  if (sharingInterval) { clearInterval(sharingInterval); sharingInterval = null; }
+  document.getElementById('shareBanner').classList.remove('show');
+  showToast('Location sharing stopped');
+}
+
+// ══════════════════════════════════════════════════════
+// ADD FROM CURRENT LOCATION
+// ══════════════════════════════════════════════════════
+function addFromCurrentLocation() {
+  if (!navigator.geolocation) { 
+    showToast('GPS not available'); 
+    return; 
+  }
+  
+  showToast('Getting your location…');
+  
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      
+      // Set the pending add location
+      pendingAdd = {
+        lat: lat,
+        lng: lng
+      };
+      
+      // Show the edit sheet with coordinates
+      showEditSheet(pendingAdd, null);
+      
+      // Add a temporary marker at the location
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.circleMarker([lat, lng], {
+        radius: 10, 
+        fillColor: '#1a73e8', 
+        color: 'white', 
+        weight: 3, 
+        fillOpacity: 1,
+      }).addTo(map).bindPopup('📍 Adding place here');
+      
+      // Center map on location
+      map.setView([lat, lng], 18, { animate: true });
+      
+      showToast('✓ Location found! Add place details below');
+    },
+    error => {
+      console.error('Geolocation error:', error);
+      showToast('Could not get your location. Please enable GPS.');
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// SUBMIT EDIT / ADD PLACE
+// ══════════════════════════════════════════════════════
+let editCat = 'landmark';
+
+function startAddPlace() {
+  pendingAdd = {};
+  showConfirm(
+    '📍 Drop a Pin',
+    'Tap anywhere on the map to place a pin for the new location, then fill in the details.',
+    'Start Dropping Pin',
+    () => { startPickMode(); }
+  );
+}
+
+function startPickMode() {
+  pickingMode = true;
+  document.getElementById('mapHint').classList.add('show');
+  map.getContainer().style.cursor = 'crosshair';
+  hideSheet();
+}
+function stopPickMode() {
+  pickingMode = false;
+  document.getElementById('mapHint').classList.remove('show');
+  map.getContainer().style.cursor = '';
+}
+
+function openEditSheet(existingId) {
+  const lm = landmarks.find(l => l.id === existingId);
+  if (lm) pendingAdd = { existingId, lat: lm.lat, lng: lm.lng };
+  showEditSheet(pendingAdd, lm);
+}
+
+function showEditSheet(data, prefill) {
+  editCat = prefill ? prefill.cat : 'landmark';
+  const cats = Object.entries(CAT_META).map(([k,v]) =>
+    `<button class="cat-chip ${k===editCat?'sel':''}" onclick="selectEditCat(this,'${k}')">${v.icon} ${v.label}</button>`
+  ).join('');
+
+  const isEdit = !!prefill;
+  showSheet(`
+    <div class="edit-panel">
+      <h3>${isEdit ? '✏️ Suggest Edit' : '➕ Add New Place'}</h3>
+      <p>${isEdit
+        ? `Suggest a correction for <strong>${prefill.name}</strong>. An admin will review before it goes live.`
+        : 'Add a place to the map. An admins will review before it goes live.'
+      }</p>
+      <div class="field-group">
+        <label class="field-label">Place Name</label>
+        <input class="field-input" id="ef_name" type="text"
+          value="${prefill ? prefill.name : ''}"
+          placeholder="e.g. Mama Grace's Pharmacy, School…">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Category</label>
+        <div class="cat-row" id="editCatRow">${cats}</div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Landmark Description <span style="color:#d93025">*</span></label>
+        <textarea class="field-textarea" id="ef_lm"
+          placeholder="Describe HOW to find it — colours, nearby buildings, distance from known point…"
+        >${prefill ? prefill.landmark : ''}</textarea>
+        <div class="field-hint">This is the most important field! Use what local people can see: "blue fence next to the mango tree"</div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Notes / Hours (optional)</label>
+        <input class="field-input" id="ef_notes" type="text"
+          value="${prefill ? (prefill.notes||'') : ''}"
+          placeholder="e.g. Open Mon–Sat, ask for John">
+      </div>
+      ${data.lat ? `<div style="background:#e8f0fe;border-radius:10px;padding:10px 14px;font-size:12px;color:#1557b0;margin-bottom:14px;font-weight:600;">📍 Pin location: ${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}</div>` : ''}
+      ${isEdit ? '' : `<div class="field-group">
+        <label class="field-label">Your Name (optional)</label>
+        <input class="field-input" id="ef_author" type="text" placeholder="e.g. Paul Fotso">
+      </div>`}
+      <button class="submit-btn" onclick="submitEdit(${isEdit ? `'${prefill.id}'` : 'null'})">
+        📩 Submit for Review
+      </button>
+    </div>
+  `);
+}
+
+function selectEditCat(btn, cat) {
+  document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('sel'));
+  btn.classList.add('sel');
+  editCat = cat;
+}
+
+function submitEdit(existingId) {
+  const name = document.getElementById('ef_name').value.trim();
+  const lm = document.getElementById('ef_lm').value.trim();
+  if (!name) { showToast('⚠️ Please enter a place name'); return; }
+  if (!lm) { showToast('⚠️ Please add a landmark description'); return; }
+
+  const lat = pendingAdd.lat || HOME[0];
+  const lng = pendingAdd.lng || HOME[1];
+  const notes = document.getElementById('ef_notes')?.value.trim() || '';
+  const author = document.getElementById('ef_author')?.value.trim() || 'Anonymous';
+
+  const edit = {
+    id: 'p' + Date.now(),
+    existingId: existingId || null,
+    type: existingId ? 'edit' : 'add',
+    name, cat: editCat, lat, lng,
+    landmark: lm, notes,
+    author,
+    submittedAt: new Date().toLocaleString(),
+    status: 'pending'
+  };
+
+  pendingEdits.push(edit);
+  saveData();
+  pendingAdd = {};
+  hideSheet();
+  showToast('✓ Submitted! Awaiting admin review.');
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN PANEL
+// ══════════════════════════════════════════════════════
+function openAdmin() {
+  renderAdminTab(activeAdminTab);
+  document.getElementById('adminOverlay').classList.add('open');
+  document.getElementById('pendingCount').textContent = pendingEdits.filter(p=>p.status==='pending').length;
+}
+function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); }
+function closeAdminOutside(e) { if (e.target === document.getElementById('adminOverlay')) closeAdmin(); }
+
+function switchAdminTab(i) {
+  activeAdminTab = i;
+  [0,1,2].forEach(j => {
+    document.getElementById('adminTab'+j).classList.toggle('active', i===j);
+  });
+  renderAdminTab(i);
+}
+
+function renderAdminTab(i) {
+  const body = document.getElementById('adminBody');
+  if (i === 0) renderPendingTab(body);
+  else if (i === 1) renderLiveTab(body);
+  else renderSettingsTab(body);
+}
+
+function renderPendingTab(body) {
+  const pending = pendingEdits.filter(p => p.status === 'pending');
+  if (!pending.length) {
+    body.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">✅</div>
+      <div class="empty-state-text">No pending submissions</div>
+    </div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div style="font-size:13px;color:#5f6368;margin-bottom:12px;">
+      ${pending.length} submission${pending.length>1?'s':''} awaiting your review
+    </div>
+    ${pending.map(p => {
+    const m = CAT_META[p.cat] || CAT_META.landmark;
+    return `
+      <div class="pending-card" id="pc_${p.id}">
+        <div class="pc-header">
+          <div class="pc-icon">${m.icon}</div>
+          <div class="pc-meta">
+            <div class="pc-name">${p.name}
+              <span class="status-pill pending" style="margin-left:6px">${p.type==='edit'?'EDIT':'NEW'}</span>
+            </div>
+            <div class="pc-lm">📍 ${p.landmark}</div>
+            ${p.notes ? `<div class="pc-lm">ℹ️ ${p.notes}</div>` : ''}
+            <div class="pc-time">By ${p.author} · ${p.submittedAt}</div>
+          </div>
+        </div>
+        <div class="pc-actions">
+          <button class="pc-btn approve" onclick="approveEdit('${p.id}')">✓ Approve</button>
+          <button class="pc-btn reject" onclick="rejectEdit('${p.id}')">✕ Reject</button>
+        </div>
+      </div>
+    `}).join('')}
+  `;
+}
+
+function renderLiveTab(body) {
+  const live = liveLandmarks();
+  if (!live.length) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗺️</div><div class="empty-state-text">No live places yet</div></div>`;
+    return;
+  }
+  const groups = {};
+  live.forEach(lm => { if (!groups[lm.cat]) groups[lm.cat] = []; groups[lm.cat].push(lm); });
+  body.innerHTML = Object.entries(CAT_META).map(([cat, meta]) => {
+    if (!groups[cat]) return '';
+    return `
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5f6368;margin:14px 0 8px;">${meta.icon} ${meta.label} (${groups[cat].length})</div>
+      ${groups[cat].map(lm => `
+        <div class="live-card">
+          <div class="lc-icon">${meta.icon}</div>
+          <div class="lc-body">
+            <div class="lc-name">${lm.name}</div>
+            <div class="lc-cat">${lm.landmark.substring(0,55)}…</div>
+          </div>
+          <button class="lc-del" onclick="deleteLive('${lm.id}')" title="Remove">🗑</button>
+        </div>
+      `).join('')}
+    `;
+  }).join('');
+}
+
+function renderSettingsTab(body) {
+  body.innerHTML = `
+    <div style="margin-bottom:18px;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;">🗺️ Map Center</div>
+      <div style="font-size:13px;color:#5f6368;margin-bottom:10px;">Current center of Leteh Navigation System</div>
+      <div style="background:#e8f0fe;border-radius:10px;padding:12px 16px;font-family:'DM Mono',monospace;font-size:13px;color:#1557b0;">
+        Lat: 5.634999 · Lng: 10.036081
+      </div>
+    </div>
+    <div style="margin-bottom:18px;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;">📊 Statistics</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:#f8f9fa;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:26px;font-weight:700;color:#1a73e8;">${liveLandmarks().length}</div>
+          <div style="font-size:12px;color:#5f6368;">Live Places</div>
+        </div>
+        <div style="background:#f8f9fa;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:26px;font-weight:700;color:#f9ab00;">${pendingEdits.filter(p=>p.status==='pending').length}</div>
+          <div style="font-size:12px;color:#5f6368;">Pending</div>
+        </div>
+        <div style="background:#f8f9fa;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:26px;font-weight:700;color:#0f9d58;">${pendingEdits.filter(p=>p.status==='approved').length}</div>
+          <div style="font-size:12px;color:#5f6368;">Approved</div>
+        </div>
+        <div style="background:#f8f9fa;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:26px;font-weight:700;color:#d93025;">${pendingEdits.filter(p=>p.status==='rejected').length}</div>
+          <div style="font-size:12px;color:#5f6368;">Rejected</div>
+        </div>
+      </div>
+    </div>
+    <button class="submit-btn" style="background:#237f7e;margin-top:4px;margin-bottom:8px;" onclick="closeAdmin();showAddNoticeSheet()">
+      📢 Post a Community Notice
+    </button>
+    <button class="submit-btn" style="background:#d93025;margin-top:4px;" onclick="confirmResetData()">
+      ⚠️ Reset to Default Data
+    </button>
+  `;
+}
+
+function approveEdit(pid) {
+  const edit = pendingEdits.find(p => p.id === pid);
+  if (!edit) return;
+  edit.status = 'approved';
+
+  if (edit.type === 'add') {
+    landmarks.push({
+      id: 'a' + Date.now(),
+      name: edit.name, cat: edit.cat, lat: edit.lat, lng: edit.lng,
+      landmark: edit.landmark, notes: edit.notes, tags: [], status: 'live'
+    });
+  } else if (edit.type === 'edit' && edit.existingId) {
+    const orig = landmarks.find(l => l.id === edit.existingId);
+    if (orig) {
+      orig.name = edit.name;
+      orig.cat = edit.cat;
+      orig.landmark = edit.landmark;
+      orig.notes = edit.notes;
+    }
+  }
+
+  saveData();
+  renderAllMarkers();
+  document.getElementById('pendingCount').textContent = pendingEdits.filter(p=>p.status==='pending').length;
+  renderPendingTab(document.getElementById('adminBody'));
+  showToast('✓ Approved & published to map');
+}
+
+function rejectEdit(pid) {
+  const edit = pendingEdits.find(p => p.id === pid);
+  if (!edit) return;
+  edit.status = 'rejected';
+  saveData();
+  document.getElementById('pendingCount').textContent = pendingEdits.filter(p=>p.status==='pending').length;
+  renderPendingTab(document.getElementById('adminBody'));
+  showToast('Submission rejected');
+}
+
+function deleteLive(id) {
+  showConfirm('Delete Place?', 'This will remove the place from the live map. This cannot be undone.', 'Delete', () => {
+    landmarks = landmarks.filter(l => l.id !== id);
+    saveData();
+    renderAllMarkers();
+    renderLiveTab(document.getElementById('adminBody'));
+    showToast('Place removed from map');
+  });
+}
+
+function confirmResetData() {
+  showConfirm('Reset All Data?', 'This will restore the original Mmuock seed data and delete all additions.', 'Reset', () => {
+    landmarks = [...SEED];
+    pendingEdits = [];
+    saveData();
+    renderAllMarkers();
+    renderAdminTab(activeAdminTab);
+    showToast('Data reset to defaults');
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// CONFIRM MODAL
+// ══════════════════════════════════════════════════════
+let confirmCallback = null;
+function showConfirm(title, msg, okLabel, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  document.getElementById('confirmOkBtn').textContent = okLabel;
+  confirmCallback = cb;
+  document.getElementById('confirmModal').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirmModal').classList.remove('open'); }
+document.getElementById('confirmOkBtn').addEventListener('click', () => {
+  closeConfirm();
+  if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+});
+
+// ══════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════
+function haversine(lat1,lng1,lat2,lng2) {
+  const R=6371000, d2r=Math.PI/180;
+  const dLat=(lat2-lat1)*d2r, dLng=(lng2-lng1)*d2r;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function fmtDist(m) {
+  return m < 1000 ? Math.round(m)+'m' : (m/1000).toFixed(1)+'km';
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN PASSWORD PROTECTION
+// ══════════════════════════════════════════════════════
+
+// Simple hash function
+async function hashPassword(password) {
+  const msgBuffer = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Store hash of admin password
+const ADMIN_HASH = "5ea7b6d711d5869f5fdc8374b618136f4c795427fe0a4fc52c6205401d8e437f";
+
+// Password overlay HTML
+function showPasswordModal() {
+  // Remove existing modal if any
+  const existingModal = document.getElementById('adminPasswordModal');
+  if (existingModal) existingModal.remove();
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.id = 'adminPasswordModal';
+  modal.innerHTML = `
+    <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center;">
+      <div style="background:white; padding:30px; border-radius:20px; text-align:center; max-width:300px; position:relative;">
+        <button onclick="document.getElementById('adminPasswordModal').remove()" style="position:absolute; top:10px; right:10px; background:none; border:none; font-size:20px; cursor:pointer; color:#666; line-height:1;">✕</button>
+        <div style="font-size:50px; margin-bottom:10px;">🔒</div>
+        <h3 style="margin-bottom:15px;">Admin Access</h3>
+        <input type="password" id="adminPasswordInput" placeholder="Enter admin password" style="width:100%; padding:10px; margin-bottom:15px; border:2px solid #ddd; border-radius:10px;">
+        <button onclick="checkAdminPassword()" style="background:#237f7e; color:white; border:none; padding:10px 20px; border-radius:10px; width:100%; font-weight:bold;">Unlock</button>
+        <p style="margin-top:10px; font-size:12px; color:#666;">Only authorized persons can login. Contact developer for help</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Check password
+window.checkAdminPassword = async function() {
+  const entered = document.getElementById('adminPasswordInput').value;
+  const enteredHash = await hashPassword(entered);
+  
+  if (enteredHash === ADMIN_HASH) {
+    document.getElementById('adminPasswordModal').style.display = 'none';
+    sessionStorage.setItem('adminAuth', 'true');
+    showToast('✓ Admin access granted');
+    // Call the original openAdmin function
+    window.originalOpenAdmin();
+  } else {
+    alert('Incorrect password');
+  }
+}
+
+// Save the original openAdmin function
+window.originalOpenAdmin = openAdmin;
+
+// Override openAdmin with password check
+openAdmin = function() {
+  if (sessionStorage.getItem('adminAuth') === 'true') {
+    window.originalOpenAdmin();
+  } else {
+    showPasswordModal();
+  }
+}
+
+// Check if already authenticated on page load
+if (sessionStorage.getItem('adminAuth') === 'true') {
+  // Already authenticated, nothing to do
+  console.log('Admin already authenticated');
+}
+
+// ══════════════════════════════════════════════════════
+// WEATHER FORECAST
+// ══════════════════════════════════════════════════════
+
+// Simple weather cache
+let weatherCache = {
+  data: null,
+  timestamp: 0,
+  lat: null,
+  lng: null
+};
+
+function showWeather() {
+  if (!userLocation) {
+    showConfirm(
+      '📍 Location Needed',
+      'Your location is needed to show weather. Tap "Enable" to continue.',
+      'Enable GPS',
+      () => {
+        locateMe(() => fetchAndShowWeather());
+      }
+    );
+    return;
+  }
+  
+  fetchAndShowWeather();
+}
+
+function fetchAndShowWeather() {
+  const lat = userLocation[0];
+  const lng = userLocation[1];
+  
+  // Check cache (valid for 30 minutes)
+  const now = Date.now();
+  if (weatherCache.data && 
+      weatherCache.lat === lat && 
+      weatherCache.lng === lng && 
+      now - weatherCache.timestamp < 30 * 60 * 1000) {
+    showWeatherSheet(weatherCache.data);
+    return;
+  }
+  
+  showToast('Loading weather…');
+  
+  // Using Open-Meteo API (free, no API key required)
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&current_weather=true&timezone=auto&forecast_days=7`;
+  
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      // Cache the data
+      weatherCache = {
+        data: data,
+        timestamp: Date.now(),
+        lat: lat,
+        lng: lng
+      };
+      
+      showWeatherSheet(data);
+    })
+    .catch(error => {
+      console.error('Weather fetch error:', error);
+      showToast('Could not load weather. Using offline forecast.');
+      showOfflineWeather();
+    });
+}
+
+function getWeatherIcon(weatherCode, isDay = true) {
+  // WMO Weather interpretation codes (https://open-meteo.com/en/docs)
+  const weatherIcons = {
+    0: isDay ? '☀️' : '🌙',        // Clear sky
+    1: '🌤️',                       // Mainly clear
+    2: '⛅',                        // Partly cloudy
+    3: '☁️',                        // Overcast
+    45: '🌫️',                       // Fog
+    48: '🌫️',                       // Rime fog
+    51: '🌧️',                       // Light drizzle
+    53: '🌧️',                       // Moderate drizzle
+    55: '🌧️',                       // Dense drizzle
+    56: '🌧️',                       // Freezing drizzle
+    57: '🌧️',                       // Dense freezing drizzle
+    61: '🌦️',                       // Slight rain
+    63: '🌧️',                       // Moderate rain
+    65: '🌧️',                       // Heavy rain
+    66: '🌧️',                       // Freezing rain
+    67: '🌧️',                       // Heavy freezing rain
+    71: '🌨️',                       // Slight snow
+    73: '🌨️',                       // Moderate snow
+    75: '🌨️',                       // Heavy snow
+    77: '🌨️',                       // Snow grains
+    80: '🌦️',                       // Slight rain showers
+    81: '🌧️',                       // Moderate rain showers
+    82: '🌧️',                       // Violent rain showers
+    85: '🌨️',                       // Slight snow showers
+    86: '🌨️',                       // Heavy snow showers
+    95: '⛈️',                       // Thunderstorm
+    96: '⛈️',                       // Thunderstorm with hail
+    99: '⛈️'                        // Heavy thunderstorm with hail
+  };
+  return weatherIcons[weatherCode] || '☁️';
+}
+
+function getFarmingTip(weatherData) {
+  const today = weatherData.daily;
+  const rainToday = today.precipitation_probability_max[0];
+  const rainTomorrow = today.precipitation_probability_max[1] || 0;
+  const tempMax = today.temperature_2m_max[0];
+  const tempMin = today.temperature_2m_min[0];
+  
+  let icon = '🌿';
+  let farmingText = '';
+  let clothingText = '';
+  
+  // FARMING ADVICE
+  if (rainToday > 70) {
+    icon = '🌱';
+    farmingText = 'Heavy rain today. Good for planting!';
+  } else if (rainToday > 40) {
+    icon = '💧';
+    farmingText = 'Rain today. Soil will be wet.';
+  } else if (tempMax > 32) {
+    icon = '☀️';
+    farmingText = 'Very hot! Water plants in evening.';
+  } else if (rainToday < 20) {
+    icon = '🚜';
+    farmingText = 'Dry days. Good for farm work.';
+  } else {
+    icon = '🌿';
+    farmingText = 'Good farming weather.';
+  }
+  
+  // CLOTHING & ADVICE
+  if (tempMax < 10) {
+    clothingText = '❄️ Wear heavy coat, gloves.';
+  } else if (tempMax < 18) {
+    clothingText = '🧥 Cool - wear jacket.';
+  } else if (tempMax > 30) {
+    clothingText = '☀️ Very hot - light clothes, hat.';
+  }
+  
+  if (rainToday > 60) {
+    clothingText = '☔ Take umbrella! ' + clothingText;
+  } else if (rainToday > 30) {
+    clothingText = '🌂 Carry umbrella. ' + clothingText;
+  }
+  
+  // Combine texts
+  const fullText = farmingText + ' ' + clothingText;
+  
+  return {
+    icon: icon,
+    text: fullText.trim()
+  };
+}
+
+function getDayName(index) {
+  const today = new Date();
+  const targetDay = new Date(today);
+  targetDay.setDate(today.getDate() + index);
+  
+  if (index === 0) return 'Today';
+  if (index === 1) return 'Tomorrow';
+  
+  // Show day name and date (e.g., "Tue 18")
+  const dayName = targetDay.toLocaleDateString('en-US', { weekday: 'short' });
+  const date = targetDay.getDate();
+  return `${dayName} ${date}`;
+}
+
+function showWeatherSheet(data) {
+  const current = data.current_weather;
+  const daily = data.daily;
+  
+  const weatherCode = current.weathercode;
+  const isDay = current.is_day === 1;
+  const weatherIcon = getWeatherIcon(weatherCode, isDay);
+  const temperature = Math.round(current.temperature);
+  
+  // Get farming tip
+  const tip = getFarmingTip(data);
+  
+  // Format sunrise/sunset times
+  const sunrise = daily.sunrise[0] ? new Date(daily.sunrise[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '6:00 AM';
+  const sunset = daily.sunset[0] ? new Date(daily.sunset[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '6:30 PM';
+  
+  // Generate 7-day forecast
+  const forecastHTML = daily.time.map((date, i) => {
+    if (i >= 7) return '';
+    const dayName = getDayName(i);
+    const icon = getWeatherIcon(daily.weathercode[i], true);
+    const maxTemp = Math.round(daily.temperature_2m_max[i]);
+    const rainProb = daily.precipitation_probability_max[i] || 0;
+    
+    return `
+      <div class="weather-day-card">
+        <div class="weather-day-name">${dayName}</div>
+        <div class="weather-day-icon">${icon}</div>
+        <div class="weather-day-temp">${maxTemp}°</div>
+        <div class="weather-day-rain">
+          <span>💧</span> ${rainProb}%
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Weather description
+  const weatherDesc = getWeatherDescription(weatherCode);
+  
+  // Show the sheet with proper z-index
+  showSheet(`
+    <div class="weather-tab" style="position:relative; z-index:2000; background:white; box-shadow:0 -4px 24px rgba(0,0,0,0.2);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="font-size:16px;font-weight:700;">🌤️ Weather Forecast</h3>
+        <button class="icon-btn" onclick="hideSheet()">✕</button>
+      </div>
+      
+      <div class="weather-current">
+        <div class="weather-current-icon">${weatherIcon}</div>
+        <div>
+          <div class="weather-current-temp">${temperature}°C</div>
+          <div class="weather-current-desc">${weatherDesc}</div>
+        </div>
+      </div>
+      
+      <div class="weather-farming-tip">
+        <div class="weather-farming-tip-icon">${tip.icon}</div>
+        <div class="weather-farming-tip-text">${tip.text}</div>
+      </div>
+      
+      <div class="weather-days">
+        ${forecastHTML}
+      </div>
+      
+      <div class="weather-sun-times">
+        <div class="weather-sun-item">
+          <div class="weather-sun-icon">🌅</div>
+          <div class="weather-sun-label">Sunrise</div>
+          <div class="weather-sun-time">${sunrise}</div>
+        </div>
+        <div class="weather-sun-item">
+          <div class="weather-sun-icon">🌇</div>
+          <div class="weather-sun-label">Sunset</div>
+          <div class="weather-sun-time">${sunset}</div>
+        </div>
+      </div>
+      
+      ${daily.precipitation_probability_max[0] > 60 ? `
+        <div class="weather-alert">
+          <div class="weather-alert-icon">⚠️</div>
+          <div class="weather-alert-text">Heavy rain expected today. Protect crops from flooding.</div>
+        </div>
+      ` : daily.temperature_2m_max[0] > 35 ? `
+        <div class="weather-alert">
+          <div class="weather-alert-icon">🔥</div>
+          <div class="weather-alert-text">Extreme heat! Water crops in evening. Watch for wilting.</div>
+        </div>
+      ` : ''}
+      
+      <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text-hint);">
+        Updated just now · 7-day forecast
+      </div>
+    </div>
+  `);
+}
+
+function getWeatherDescription(code) {
+  const descriptions = {
+    0: 'Clear sky',
+    1: 'Mostly clear',
+    2: 'Partly cloudy',
+    3: 'Cloudy',
+    45: 'Foggy',
+    48: 'Foggy',
+    51: 'Light drizzle',
+    53: 'Drizzle',
+    55: 'Heavy drizzle',
+    61: 'Light rain',
+    63: 'Moderate rain',
+    65: 'Heavy rain',
+    80: 'Rain showers',
+    81: 'Moderate rain',
+    82: 'Heavy rain',
+    95: 'Thunderstorm',
+    96: 'Storm with hail',
+    99: 'Heavy storm'
+  };
+  return descriptions[code] || 'Variable weather';
+}
+
+function showOfflineWeather() {
+  // Fallback offline forecast based on typical weather patterns
+  showSheet(`
+    <div class="weather-tab">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="font-size:16px;font-weight:700;">🌤️ Weather</h3>
+        <button class="icon-btn" onclick="hideSheet()">✕</button>
+      </div>
+      
+      <div class="weather-current" style="background:linear-gradient(145deg,#5f6368,#3c4043);">
+        <div class="weather-current-icon">⛅</div>
+        <div>
+          <div class="weather-current-temp">24°C</div>
+          <div class="weather-current-desc">Typical weather</div>
+        </div>
+      </div>
+      
+      <div class="weather-farming-tip">
+        <div class="weather-farming-tip-icon">🌿</div>
+        <div class="weather-farming-tip-text">Typical farming weather for Leteh. Good for most crops.</div>
+      </div>
+      
+      <div class="weather-days">
+        <div class="weather-day-card"><div class="weather-day-name">Today</div><div class="weather-day-icon">⛅</div><div class="weather-day-temp">24°</div><div class="weather-day-rain"><span>💧</span> 40%</div></div>
+        <div class="weather-day-card"><div class="weather-day-name">Tomorrow</div><div class="weather-day-icon">🌧️</div><div class="weather-day-temp">23°</div><div class="weather-day-rain"><span>💧</span> 70%</div></div>
+        <div class="weather-day-card"><div class="weather-day-name">Day 3</div><div class="weather-day-icon">☁️</div><div class="weather-day-temp">25°</div><div class="weather-day-rain"><span>💧</span> 30%</div></div>
+      </div>
+      
+      <div class="weather-sun-times">
+        <div class="weather-sun-item"><div class="weather-sun-icon">🌅</div><div class="weather-sun-label">Sunrise</div><div class="weather-sun-time">6:12 AM</div></div>
+        <div class="weather-sun-item"><div class="weather-sun-icon">🌇</div><div class="weather-sun-label">Sunset</div><div class="weather-sun-time">6:24 PM</div></div>
+      </div>
+      
+      <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text-hint);">
+        Offline mode · Typical forecast
+      </div>
+    </div>
+  `);
+}
+
+// ══════════════════════════════════════════════════════
+// MARKET DAY CALENDAR
+// ══════════════════════════════════════════════════════
+// 8-day cycle anchored: 2026-02-20 = day 0 = Mboegnwa (big market)
+const MARKET_DAYS = [
+  { name: 'Mboegnwa',   icon: '🛒', type: 'big',     desc: 'The BIG market day. Everyone comes to Nkongle Market. Full stores, best prices, busy roads.' },
+  { name: 'Mbeugleu',   icon: '🌤️', type: 'regular', desc: 'Quiet day. Good for farm work and local errands.' },
+  { name: 'Njungong',   icon: '🌿', type: 'regular', desc: 'Regular farming day. Agric Post open for advice.' },
+  { name: 'Mbeunkeu',   icon: '☀️', type: 'regular', desc: 'Regular farming day. Good for planting or harvesting.' },
+  { name: 'Njulekhea',  icon: '🌱', type: 'regular', desc: 'Regular day. Markets quiet, roads free.' },
+  { name: "Fa'a",       icon: '🏪', type: 'small',   desc: 'Small market day. Most stores open at Nkongle Market. Good for quick shopping.' },
+  { name: 'Telang',     icon: '🌾', type: 'regular', desc: 'Regular farming day except for the Manyis' },
+  { name: "Nganga'a",   icon: '🚫', type: 'nofarm',  desc: 'No farming day. Tradition forbids working the land. Rest, visit family, community.' },
+];
+const MARKET_ANCHOR = new Date(2026, 1, 20); // 20 Feb 2026 = Mboegnwa
+
+function getMarketDayIndex(date) {
+  const anchor = new Date(MARKET_ANCHOR.getFullYear(), MARKET_ANCHOR.getMonth(), MARKET_ANCHOR.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = Math.round((target - anchor) / 86400000);
+  return ((diff % 8) + 8) % 8;
+}
+
+function initMarketDayBanner() {
+  const today = new Date();
+  const idx = getMarketDayIndex(today);
+  const day = MARKET_DAYS[idx];
+  const pill = document.getElementById('marketDayPill');
+  const text = document.getElementById('marketDayText');
+  text.textContent = day.icon + ' ' + day.name;
+  pill.className = 'market-day-pill';
+  if      (day.type === 'big')    pill.classList.add('big-market');
+  else if (day.type === 'small')  pill.classList.add('small-market');
+  else if (day.type === 'nofarm') pill.classList.add('no-farm');
+  else                            pill.classList.add('regular');
+  // Notice dot
+  if (getActiveNotices().length > 0) document.getElementById('noticeDot').classList.add('show');
+}
+
+function showMarketCalendar() {
+  const today = new Date();
+  const todayIdx = getMarketDayIndex(today);
+  const rows = MARKET_DAYS.map((day, i) => {
+    const isToday = i === todayIdx;
+    const daysAhead = ((i - todayIdx) + 8) % 8;
+    const target = new Date(today); target.setDate(today.getDate() + daysAhead);
+    const dateStr = target.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    let rowClass = 'market-day-row';
+    if (isToday)          rowClass += ' today';
+    else if (day.type === 'big')    rowClass += ' big';
+    else if (day.type === 'small')  rowClass += ' small';
+    else if (day.type === 'nofarm') rowClass += ' nofarm';
+    const badge = isToday
+      ? `<span class="mdr-badge today-badge">TODAY</span>`
+      : `<span class="mdr-countdown">in ${daysAhead}d</span>`;
+    return `<div class="${rowClass}">
+      <div class="mdr-icon">${day.icon}</div>
+      <div class="mdr-body">
+        <div class="mdr-name">${day.name}</div>
+        <div class="mdr-desc">${dateStr} · ${day.desc}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }).join('');
+  showSheet(`<div class="market-sheet" style="max-height:75vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h3 style="font-size:16px;font-weight:700;">📅 Mmuock Leteh Week Days</h3>
+      <button class="icon-btn" onclick="hideSheet()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5;">
+      8 day weekly community calendar. Shows what can and cannot be done on each day.
+    </p>
+    ${rows}
+    <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text-hint);">
+      Mboegnwa → Mbeugleu → Njungong → Mbeunkeu → Njulekhea → Fa'a → Telang → Nganga'a
+    </div>
+  </div>`);
+}
+
+// ══════════════════════════════════════════════════════
+// NOTICE BOARD
+// ══════════════════════════════════════════════════════
+function getActiveNotices() {
+  const today = new Date();
+  return landmarks.filter(l => l.cat === 'notice' && l.status === 'live').filter(n => {
+    if (!n.expiresAt) return true;
+    return new Date(n.expiresAt) >= today;
+  });
+}
+
+function showNoticeBoard() {
+  const notices = getActiveNotices();
+  const cards = notices.length === 0
+    ? `<div style="text-align:center;padding:32px 20px;color:var(--text-hint);">
+        <div style="font-size:40px;margin-bottom:8px;">📭</div>
+        <div style="font-size:14px;font-weight:600;">No active notices</div>
+        <div style="font-size:12px;margin-top:4px;">Check back for community announcements.</div>
+      </div>`
+    : notices.map(n => {
+        const t = n.noticeType || 'info';
+        const expStr = n.expiresAt
+          ? `Expires ${new Date(n.expiresAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`
+          : '';
+        return `<div class="notice-card ${t}">
+          <span class="notice-type-pill ${t}">${t.charAt(0).toUpperCase()+t.slice(1)}</span>
+          <div class="notice-title">${n.name}</div>
+          <div class="notice-body">${n.notes}</div>
+          <div class="notice-meta">📍 ${n.landmark.substring(0,55)}${n.landmark.length>55?'…':''}
+            ${expStr ? ` · <span class="notice-expires">${expStr}</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+  const adminBtn = sessionStorage.getItem('adminAuth') === 'true'
+    ? `<button class="submit-btn" style="margin-top:12px;background:#237f7e;" onclick="hideSheet();showAddNoticeSheet()">📢 Post a Notice</button>`
+    : '';
+
+  showSheet(`<div class="notice-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h3 style="font-size:16px;font-weight:700;">📢 Community Notice Board</h3>
+      <button class="icon-btn" onclick="hideSheet()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">
+      ${notices.length} active notice${notices.length!==1?'s':''} for Mmuock Leteh
+    </p>
+    ${cards}
+    ${adminBtn}
+  </div>`);
+}
+
+let _noticeType = 'urgent';
+function showAddNoticeSheet() {
+  _noticeType = 'urgent';
+  showSheet(`<div class="edit-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h3>📢 Post a Community Notice</h3>
+      <button class="icon-btn" onclick="hideSheet()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.5;">
+      Announcements will appear on the notice board for all users.
+    </p>
+    <div class="field-group">
+      <label class="field-label">Notice Title</label>
+      <input class="field-input" id="nf_name" type="text" placeholder="e.g. Road closure near agric post">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Type</label>
+      <div class="cat-row">
+        <button class="cat-chip sel" id="ntype_urgent" onclick="selectNoticeType('urgent')">🚨 Urgent</button>
+        <button class="cat-chip"     id="ntype_info"   onclick="selectNoticeType('info')">ℹ️ Info</button>
+        <button class="cat-chip"     id="ntype_event"  onclick="selectNoticeType('event')">🎉 Event</button>
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Details <span style="color:#d93025">*</span></label>
+      <textarea class="field-textarea" id="nf_notes" placeholder="Full details of the notice…"></textarea>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Location / Where it applies</label>
+      <input class="field-input" id="nf_lm" type="text" placeholder="e.g. Near Zone A borehole, or whole village">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Expires on (optional)</label>
+      <input class="field-input" id="nf_expires" type="date">
+    </div>
+    <button class="submit-btn" style="background:#e65100;" onclick="submitNotice()">📢 Publish Notice</button>
+  </div>`);
+}
+
+function selectNoticeType(type) {
+  ['urgent','info','event'].forEach(t => {
+    const el = document.getElementById('ntype_'+t);
+    if (el) el.classList.toggle('sel', t === type);
+  });
+  _noticeType = type;
+}
+
+function submitNotice() {
+  const name  = document.getElementById('nf_name').value.trim();
+  const notes = document.getElementById('nf_notes').value.trim();
+  const lm    = document.getElementById('nf_lm').value.trim() || 'Whole village';
+  const exp   = document.getElementById('nf_expires').value;
+  if (!name)  { showToast('⚠️ Please enter a notice title'); return; }
+  if (!notes) { showToast('⚠️ Please add notice details'); return; }
+  landmarks.push({
+    id: 'notice_'+Date.now(), name, cat:'notice',
+    lat: HOME[0], lng: HOME[1], landmark: lm, notes,
+    tags:['Notice'], noticeType: _noticeType,
+    expiresAt: exp || null, status:'live'
+  });
+  saveData();
+  renderAllMarkers();
+  const active = getActiveNotices();
+  document.getElementById('noticeDot').classList.toggle('show', active.length > 0);
+  hideSheet();
+  showToast('✓ Notice published');
+}
+
+// ══════════════════════════════════════════════════════
+// ZONE LABELS
+// ══════════════════════════════════════════════════════
+const ZONES = [
+  { name: 'NTEMNDZEM I',    lat: 5.63278, lng: 10.03728 },
+  { name: 'NTEMNDZEM II',   lat: 5.63113, lng: 10.04459 },
+  { name: 'Mve',       lat: 5.6451, lng: 10.0333 },
+  { name: 'KONGHO',       lat: 5.6439, lng: 10.04375 },
+  { name: 'MALETA',       lat: 5.6355, lng: 10.0680 },
+  { name: "S'HÊ-NTSI'HI",lat: 5.6255, lng: 10.0340 },
+  { name: 'NKONGLE',      lat: 5.6358, lng: 10.0352 },
+  {name: 'BELANG',       lat: 5.6606, lng: 10.03357 },
+  {name: 'BEKWOP',       lat: 5.63869, lng: 10.05000 },
+];
+
+function renderZoneLabels() {
+  ZONES.forEach(z => {
+    L.marker([z.lat, z.lng], {
+      icon: L.divIcon({
+        className: 'zone-label',
+        html: `<div class="zone-label-inner">${z.name}</div>`,
+        iconAnchor: [0, 0],
+      }),
+      interactive: false,
+      keyboard: false,
+    }).addTo(map);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// LANDMARK-BASED DIRECTIONS
+// ══════════════════════════════════════════════════════
+function getBearing(lat1, lng1, lat2, lng2) {
+  const d = Math.PI/180;
+  const y = Math.sin((lng2-lng1)*d)*Math.cos(lat2*d);
+  const x = Math.cos(lat1*d)*Math.sin(lat2*d) - Math.sin(lat1*d)*Math.cos(lat2*d)*Math.cos((lng2-lng1)*d);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function bearingToCardinal(deg) {
+  return ['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(deg/45)%8];
+}
+
+function getLandmarkDirections(dest) {
+  const steps = [];
+  if (!dest) return steps;
+  const MARKET = { lat:5.6349, lng:10.0359 };
+  const ANCHORS = [
+    { name:'3 Corners junction', lat:5.6344, lng:10.0369, id:'s7' },
+    { name:'the Catholic Hospital', lat:5.6305, lng:10.0414, id:'s8' },
+    { name:'the Fotang Health Centre', lat:5.6265, lng:10.0323, id:'s15' },
+    { name:"the Fon's Palace", lat:5.6463, lng:10.0374, id:'s6' },
+  ];
+  const distFromMarket = haversine(MARKET.lat, MARKET.lng, dest.lat, dest.lng);
+  if (distFromMarket < 80) {
+    steps.push('Start at Nkongle Market — your destination is right here at the market.');
+    return steps;
+  }
+  steps.push('Start at Nkongle Market (the main market in the centre of Leteh).');
+  const dir = bearingToCardinal(getBearing(MARKET.lat, MARKET.lng, dest.lat, dest.lng));
+  const useful = ANCHORS.filter(a => a.id !== dest.id && haversine(a.lat, a.lng, dest.lat, dest.lng) < distFromMarket);
+  useful.sort((a,b) => haversine(a.lat,a.lng,dest.lat,dest.lng)-haversine(b.lat,b.lng,dest.lat,dest.lng));
+  if (useful.length > 0) {
+    const via = useful[0];
+    const dirToVia = bearingToCardinal(getBearing(MARKET.lat,MARKET.lng,via.lat,via.lng));
+    steps.push(`Head ${dirToVia} from the market (~${fmtDist(haversine(MARKET.lat,MARKET.lng,via.lat,via.lng))}) towards ${via.name}.`);
+    const dirFinal = bearingToCardinal(getBearing(via.lat,via.lng,dest.lat,dest.lng));
+    steps.push(`From ${via.name}, continue ${dirFinal} about ${fmtDist(haversine(via.lat,via.lng,dest.lat,dest.lng))}.`);
+  } else {
+    steps.push(`Head ${dir} from the market for about ${fmtDist(distFromMarket)}.`);
+  }
+  steps.push(`Look for: ${dest.landmark}`);
+  return steps;
+}
+
+// ══════════════════════════════════════════════════════
+// SEASONAL FARMLAND CALENDAR
+// ══════════════════════════════════════════════════════
+function getCurrentSeason() {
+  const m = new Date().getMonth(); // 0=Jan
+  if (m>=2 && m<=4) return {
+    name:'Main Planting Season', icon:'🌱',
+    desc:'March–May. First rains beginning. Prepare soil and plant main crops.',
+    crops:[
+      {icon:'🥔',name:'Potatoes',   status:'Planting now',    active:true},
+      {icon:'🌽',name:'Maize',        status:'Planting now',    active:true},
+      {icon:'🫘',name:'Beans',        status:'Planting now',    active:true},
+      {icon:'🌿',name:'Cocoyam',      status:'Planting now',    active:true},
+      {icon:'🍌',name:'Plantain',     status:'Maintain suckers',active:false},
+      {icon:'🥬',name:'Vegetables',   status:'Begin planting',  active:true},
+    ],
+    tips:['Prepare compost before the rains intensify.','Plant maize on ridges to avoid waterlogging.','Good time to buy seeds at the Agric Post.']
+  };
+  if (m>=5 && m<=7) return {
+    name:'Growing & Weeding Season', icon:'☘️',
+    desc:'June–August. Peak rains. Crops growing fast — weeding and care critical.',
+    crops:[
+      {icon:'🥔',name:'Potatoes',   status:'Growing, spray and mulch',    active:true},
+      {icon:'🌽',name:'Maize',        status:'Growing, Weed!',    active:true},
+      {icon:'🫘',name:'Beans',        status:'Flowering',    active:true},
+      {icon:'🌿',name:'Cocoyam',      status:'Growing',    active:true},
+      {icon:'🍌',name:'Plantain',     status:'Check bunches',active:false},
+      {icon:'🥬',name:'Vegetables',   status:'Harvest if ready',  harvest:true},
+    ],
+    tips:['Weed at least twice this month.','Watch for fungal disease in wet weather.','Early maize may be ready to harvest by August.']
+  };
+  if (m>=8 && m<=10) return {
+    name:'Main Harvest Season', icon:'🌾',
+    desc:'September–November. Rains easing. Main harvest time.',
+    crops:[
+      {icon:'🌽',name:'Maize',      status:'Harvesting!',    harvest:true},
+      {icon:'🫘',name:'Beans',      status:'Harvesting!',    harvest:true},
+      {icon:'🥔',name:'Potatoes',   status:'Growing, spray and prepare to harvest',    active:true},
+      {icon:'🌿',name:'Cocoyam',    status:'Begin harvest',  harvest:true},
+      {icon:'🍌',name:'Plantain',   status:'Harvest bunches',harvest:true},
+      {icon:'🥬',name:'Vegetables', status:'Plant 2nd crop', active:true},
+    ],
+    tips:['Dry maize well before storage to avoid mould.','Good time to sell produce at Nkongle Market.','Second planting starts in October.']
+  };
+  return {
+    name:'Dry Season & Rest', icon:'☀️',
+    desc:'December–February. Dry season. Rest land, maintain tools, plan for next season.',
+    crops:[
+      {icon:'🌽',name:'Maize',      status:'In storage',     active:false},
+      {icon:'🫘',name:'Beans',      status:'In storage',     active:false},
+      {icon:'🥔',name:'Potatoes',   status:'Seeds in storage. Plant when rains return in March',    active:true},
+      {icon:'🌿',name:'Cocoyam',    status:'Late harvest',   harvest:true},
+      {icon:'🍌',name:'Plantain',   status:'Harvest bunches',harvest:true},
+      {icon:'🥬',name:'Vegetables', status:'Dry-season veg', active:true},
+    ],
+    tips:['Good time to clear and prepare farms for planting season.','Check seeds and order more if needed.','Get hoes, cutlasses, sprayers and other farm tools ready.']
+  };
+}
+
+function showSeasonalFarmland() {
+  const s = getCurrentSeason();
+  const cropCards = s.crops.map(c =>
+    `<div class="crop-card ${c.harvest?'harvest':c.active?'active':''}">
+      <div class="crop-icon">${c.icon}</div>
+      <div class="crop-name">${c.name}</div>
+      <div class="crop-status">${c.status}</div>
+    </div>`).join('');
+  const tips = s.tips.map(t =>
+    `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--surface-3);">
+      <span style="font-size:16px;flex-shrink:0;">💡</span>
+      <div style="font-size:13px;line-height:1.5;">${t}</div>
+    </div>`).join('');
+  const monthName = new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  showSheet(`<div style="padding:16px 20px 28px;max-height:75vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;">🌾 Farming Calendar</h3>
+      <button class="icon-btn" onclick="hideSheet()">✕</button>
+    </div>
+    <div class="season-banner">
+      <div class="season-icon">${s.icon}</div>
+      <div>
+        <div class="season-name">${s.name}</div>
+        <div class="season-desc">${s.desc}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:8px;">${monthName} — Crop Status</div>
+    <div class="crop-grid">${cropCards}</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">Farming Tips This Month</div>
+    ${tips}
+    <div style="margin-top:14px;background:var(--blue-light);border-radius:var(--radius);padding:12px 14px;font-size:12px;color:var(--blue-dark);">
+      📍 Visit the <strong>Agric Post</strong> on S'hê-Ntsi'hi for seeds and fertiliser.
+    </div>
+  </div>`);
+}
+
+// ══════════════════════════════════════════════════════
+// SERVICE WORKER (offline tiles)
+// ══════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  const sw = `
+const TC='mmuock-tiles-v1';
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',()=>self.clients.claim());
+self.addEventListener('fetch',e=>{
+  if(e.request.url.includes('tile.openstreetmap.org')){
+    e.respondWith(caches.open(TC).then(async c=>{
+      const r=await c.match(e.request);
+      if(r) return r;
+      try{const res=await fetch(e.request);if(res.ok)c.put(e.request,res.clone());return res;}
+      catch{return new Response('',{status:503});}
+    }));
+  }
+});`;
+  const blob = new Blob([sw], {type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob));
+}
+
+// ══════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════
+loadData();
+initMap();
+document.getElementById('pendingCount').textContent = pendingEdits.filter(p=>p.status==='pending').length;
+
+</script>
+</body>
+</html>

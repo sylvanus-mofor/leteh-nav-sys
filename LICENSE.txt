@@ -1,0 +1,37 @@
+# Custom Open Source License - Attribution, NonCommercial, ShareAlike
+
+Copyright (c) 2026 SN Tech Pros
+
+## Terms and Conditions
+
+### 1. Definitions
+- **"Software"** means the source code, documentation, and associated files in this repository.
+- **"You"** means the individual or entity exercising the permissions granted below.
+- **"NonCommercial"** means not primarily intended for or directed towards commercial advantage or monetary compensation.
+
+### 2. Grant of Rights
+Permission is hereby granted, free of charge, to any person obtaining a copy of this Software, to use, copy, modify, merge, and distribute copies of the Software, subject to the following conditions:
+
+### 3. Conditions
+
+#### a) Attribution Required
+You must give appropriate credit to the original creator (SN Tech Pros), provide a link to the original source, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+
+#### b) NonCommercial Use Only
+You may not use the Software for commercial purposes. Commercial purposes include, but are not limited to:
+- Selling the Software or derivative works
+- Using the Software to provide paid services
+- Incorporating the Software into a product that generates revenue
+- Using the Software in a business environment where it contributes to profit-making activities
+
+#### c) ShareAlike (Open Source Required)
+If you remix, transform, or build upon the Software, you must distribute your contributions under the same license as the original. Any derivative works must remain open source and non-commercial.
+
+#### d) No Additional Restrictions
+You may not apply legal terms or technological measures that legally restrict others from doing anything this license permits.
+
+### 4. Disclaimer of Warranty
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+### 5. Limitation of Liability
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
