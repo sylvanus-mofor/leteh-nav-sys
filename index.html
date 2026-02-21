@@ -1155,7 +1155,6 @@ body {
   <div class="category-chips" id="categoryChips">
     <button class="chip active" data-cat="all" onclick="filterCat(this,'all')">🗺️ All</button>
     <button class="chip" data-cat="health" onclick="filterCat(this,'health')">🩺 Health</button>
-    <button class="chip" data-cat="water" onclick="filterCat(this,'water')">💧 Water</button>
     <button class="chip" data-cat="market" onclick="filterCat(this,'market')">🛒 Market</button>
     <button class="chip" data-cat="church" onclick="filterCat(this,'church')">⛪ Church</button>
     <button class="chip" data-cat="home" onclick="filterCat(this,'home')">🏡 Home/Residence/Compound</button>
@@ -1168,7 +1167,6 @@ body {
     <button class="chip" data-cat="palace" onclick="filterCat(this,'palace')">🏰 Palace</button>
     <button class="chip" data-cat="finacialinstitution" onclick="filterCat(this,'finacialinstitution')">💰 Financial Institution</button>
     <button class="chip" data-cat="touristicsite" onclick="filterCat(this,'touristicsite')">📸 Touristic Site</button>
-    <button class="chip" data-cat="notice" onclick="filterCat(this,'notice')">📢 Notices</button>
   </div>
   <div class="search-dropdown" id="searchDropdown"></div>
 </div>
@@ -1236,6 +1234,7 @@ body {
 // ══════════════════════════════════════════════════════
 const HOME = [5.634999, 10.036081];
 const ZOOM = 15;
+const APP_URL = 'https://sylvanus-mofor.github.io/leteh-nav-sys';
 
 const CAT_META = {
   landmark: { icon: '🏛️', color: '#f5f5f5', label: 'Landmark',  bg: '#e8f0fe' },
@@ -1277,7 +1276,7 @@ const SEED = [
     landmark:'Main crossroads where the Dschang road meets Mmuock Leteh village center by way of S\'hê-Ntsi\'hi',
     notes:'Road junction, car park', tags:['Taxis','Motos','Car Park'], status:'live' },
   { id:'s8', name:'Catholic Hospital', cat:'health', lat:5.6305, lng:10.0414,
-    landmark:'Yellow building with red roof, located 1.2km east of the market on the Dschang road',
+    landmark:'Yellow building with red roof, located 1.2km east of Nkongle market on the Dschang road',
     notes:'Daily 24/7', tags:['Healthcare','Medicines'], status:'live' },
   { id:'s9', name:'St. John Paul II College', cat:'school', lat:5.6301, lng:10.0418,
     landmark:'College, located 80m from the Catholic Hospital on the Dschang road',
@@ -1289,13 +1288,13 @@ const SEED = [
     landmark:'Agricultural post in the farmland area',
     notes:'Mon-Fri', tags:['Agriculture','Seeds','plant nursery'], status:'live' },
   { id:'s12', name:'Government Technical College Ntemndzem', cat:'school', lat:5.6297, lng:10.0338,
-    landmark:'GTTC school compound with multiple buildings, located on Dschang road about 1.5km from the market',
+    landmark:'GTTC school compound with multiple buildings, located on Dschang road about 1.5km from Nkongle market',
     notes:'Free. Operational 24h', tags:['CETIC','GTTC','Technical School'], status:'live' },
   { id:'s13', name:'Government Technical College Ntemndzem', cat:'preschool', lat:5.6305, lng:10.0340,
     landmark:'Government nursery school, located on S\'hê-Ntsi\'hi near GTTC (CETIC de Ntemndzem)',
     notes:'Mon-Fri except on holidays', tags:['Education','Nursery School'], status:'live' },
   { id:'s14', name:'Mmuock Leteh Cooperative Credit Union', cat:'finacialinstitution', lat:5.6339, lng:10.0370,
-    landmark:'Located at 3 corners Ntemndzem, across from the market towards S\'hê-Ntsi\'hi',
+    landmark:'Located at 3 corners Ntemndzem, across from Nkongle market towards S\'hê-Ntsi\'hi',
     notes:'Open Mon-Fri 8am-4pm. Offers savings and loans', tags:['Finance','MULECCUL'], status:'live' },
   { id:'s15', name:'Fotang Integrated Health Centre', cat:'health', lat:5.6265, lng:10.0323,
     landmark:'Large H-shaped building on S\'hê-Ntsi\'hi',
@@ -1316,7 +1315,7 @@ const SEED = [
     landmark:'Located in Belang Fotang, about 3km from Nkongle market',
     notes:'Mon-Fri except on holidays', tags:['Education','Primary School'], status:'live' },
   { id:'s21', name:"Pa Taa Laman's Residence", cat:'home', lat:5.63442, lng:10.03615,
-    landmark:'A private residence located few meters from the market.',
+    landmark:'A private residence located few meters from Nkongle market.',
     notes:'Private residence, not open to the public', tags:['Home','Residence','Compound'], status:'live' },
   { id:'n2', name:'Community Meeting at the Palace', cat:'notice', lat:5.6463, lng:10.0364,
     landmark:"Fon's Palace — main hall",
@@ -1340,9 +1339,9 @@ function loadData() {
   try {
     const stored = localStorage.getItem('mmuock_landmarks');
     const version = localStorage.getItem('mmuock_version');
-    if (!version || version !== 'v1') {
+    if (!version || version !== 'v2') {
       landmarks = [...SEED];
-      localStorage.setItem('mmuock_version', 'v1');
+      localStorage.setItem('mmuock_version', 'v2');
     } else {
       landmarks = stored ? JSON.parse(stored) : [...SEED];
     }
@@ -1747,20 +1746,19 @@ function shareMyLocation() {
     userLocation = [pos.coords.latitude, pos.coords.longitude];
     const lat = pos.coords.latitude.toFixed(6);
     const lng = pos.coords.longitude.toFixed(6);
-    const shareUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=17`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent('My location: ' + shareUrl)}`;
-    const smsUrl = `sms:?body=${encodeURIComponent('My location: ' + shareUrl)}`;
+    const shareUrl = `${APP_URL}?lat=${lat}&lng=${lng}`;
+    const msg = `📍 My location on Leteh Map: ${shareUrl}`;
 
     document.getElementById('shareLocContent').innerHTML = `
       <div class="share-link-box">${shareUrl}</div>
       <div class="share-grid">
-        <button class="share-opt" onclick="navigator.clipboard&&navigator.clipboard.writeText('${shareUrl}');showToast('Link copied!')">
+        <button class="share-opt" onclick="copyToClipboard('${shareUrl}')">
           <span>📋</span>Copy Link
         </button>
-        <button class="share-opt" onclick="window.open('${waUrl}','_blank')">
+        <button class="share-opt" onclick="shareViaWhatsApp('${encodeURIComponent(msg)}')">
           <span>💬</span>WhatsApp
         </button>
-        <button class="share-opt" onclick="window.open('${smsUrl}')">
+        <button class="share-opt" onclick="shareViaSMS('${encodeURIComponent(msg)}')">
           <span>📱</span>SMS
         </button>
         <button class="share-opt" onclick="startLiveShare(${lat},${lng})">
@@ -1780,21 +1778,21 @@ function shareMyLocation() {
 function sharePlace(id) {
   const lm = landmarks.find(l => l.id === id);
   if (!lm) return;
-  const url = `https://www.openstreetmap.org/?mlat=${lm.lat}&mlon=${lm.lng}&zoom=17`;
-  const text = `${lm.name} – ${lm.landmark} | Leteh Navigation`;
+  const shareUrl = `${APP_URL}?place=${lm.id}`;
+  const msg = `📍 ${lm.name} on Leteh Map — ${lm.landmark} | ${shareUrl}`;
   showSheet(`
     <div class="share-panel">
       <h3>📤 Share: ${lm.name}</h3>
       <p>${lm.landmark}</p>
-      <div class="share-link-box">${url}</div>
+      <div class="share-link-box">${shareUrl}</div>
       <div class="share-grid">
-        <button class="share-opt" onclick="navigator.clipboard&&navigator.clipboard.writeText('${url}');showToast('Copied!')">
+        <button class="share-opt" onclick="copyToClipboard('${shareUrl}')">
           <span>📋</span>Copy Link
         </button>
-        <button class="share-opt" onclick="window.open('https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}','_blank')">
+        <button class="share-opt" onclick="shareViaWhatsApp('${encodeURIComponent(msg)}')">
           <span>💬</span>WhatsApp
         </button>
-        <button class="share-opt" onclick="window.open('sms:?body=${encodeURIComponent(text + ' ' + url)}')">
+        <button class="share-opt" onclick="shareViaSMS('${encodeURIComponent(msg)}')">
           <span>📱</span>SMS
         </button>
         <button class="share-opt" onclick="map.setView([${lm.lat},${lm.lng}],17);hideSheet()">
@@ -2203,6 +2201,32 @@ document.getElementById('confirmOkBtn').addEventListener('click', () => {
 // ══════════════════════════════════════════════════════
 // UTILITIES
 // ══════════════════════════════════════════════════════
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('✓ Link copied!'));
+  } else {
+    showToast('✓ Link copied!');
+  }
+}
+
+function shareViaWhatsApp(encodedMsg) {
+  const a = document.createElement('a');
+  a.href = 'https://wa.me/?text=' + encodedMsg;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function shareViaSMS(encodedMsg) {
+  const a = document.createElement('a');
+  a.href = 'sms:?body=' + encodedMsg;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function haversine(lat1,lng1,lat2,lng2) {
   const R=6371000, d2r=Math.PI/180;
   const dLat=(lat2-lat1)*d2r, dLng=(lng2-lng1)*d2r;
@@ -2886,11 +2910,11 @@ function getLandmarkDirections(dest) {
   if (useful.length > 0) {
     const via = useful[0];
     const dirToVia = bearingToCardinal(getBearing(MARKET.lat,MARKET.lng,via.lat,via.lng));
-    steps.push(`Head ${dirToVia} from the market (~${fmtDist(haversine(MARKET.lat,MARKET.lng,via.lat,via.lng))}) towards ${via.name}.`);
+    steps.push(`Head ${dirToVia} from Nkongle market (~${fmtDist(haversine(MARKET.lat,MARKET.lng,via.lat,via.lng))}) towards ${via.name}.`);
     const dirFinal = bearingToCardinal(getBearing(via.lat,via.lng,dest.lat,dest.lng));
     steps.push(`From ${via.name}, continue ${dirFinal} about ${fmtDist(haversine(via.lat,via.lng,dest.lat,dest.lng))}.`);
   } else {
-    steps.push(`Head ${dir} from the market for about ${fmtDist(distFromMarket)}.`);
+    steps.push(`Head ${dir} from Nkongle market for about ${fmtDist(distFromMarket)}.`);
   }
   steps.push(`Look for: ${dest.landmark}`);
   return steps;
@@ -3019,6 +3043,78 @@ self.addEventListener('fetch',e=>{
 loadData();
 initMap();
 document.getElementById('pendingCount').textContent = pendingEdits.filter(p=>p.status==='pending').length;
+
+// Handle incoming shared links
+(function handleSharedLink() {
+  const params = new URLSearchParams(window.location.search);
+
+  // Shared place link: ?place=s8
+  const placeId = params.get('place');
+  if (placeId) {
+    const lm = landmarks.find(l => l.id === placeId);
+    if (lm) {
+      setTimeout(() => {
+        map.setView([lm.lat, lm.lng], 17, { animate: false });
+        openPlaceSheet(lm.id);
+        showToast('📍 ' + lm.name);
+      }, 600);
+    }
+    return;
+  }
+
+  // Shared location link: ?lat=5.634&lng=10.036
+  const lat = parseFloat(params.get('lat'));
+  const lng = parseFloat(params.get('lng'));
+  if (!isNaN(lat) && !isNaN(lng)) {
+    setTimeout(() => {
+      map.setView([lat, lng], 17, { animate: false });
+      L.circleMarker([lat, lng], {
+        radius: 12, fillColor: '#d93025', color: 'white', weight: 3, fillOpacity: 1
+      }).addTo(map).bindPopup('📍 Shared location').openPopup();
+      showToast('📍 Shared location loaded');
+      // Offer to navigate there
+      showSheet(`
+        <div class="place-sheet">
+          <div class="place-header">
+            <div class="place-icon-wrap" style="background:#fce8e6;">📍</div>
+            <div style="flex:1;min-width:0;">
+              <div class="place-title">Shared Location</div>
+              <div class="place-cat">Someone shared this position with you</div>
+            </div>
+            <button class="icon-btn" onclick="hideSheet()" style="flex-shrink:0;">✕</button>
+          </div>
+          <div class="place-landmark-desc">
+            <span>🌐</span>
+            <div>Coordinates: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+          </div>
+          <div class="place-actions">
+            <button class="place-action-btn" onclick="startNavigateToCoords(${lat},${lng})">
+              <div class="pab-icon">🧭</div>Navigate
+            </button>
+            <button class="place-action-btn" onclick="hideSheet()">
+              <div class="pab-icon">🗺️</div>View Map
+            </button>
+          </div>
+        </div>
+      `);
+    }, 600);
+  }
+})();
+
+function startNavigateToCoords(lat, lng) {
+  const dest = { id:'_shared', name:'Shared Location', lat, lng,
+    landmark:`Coordinates: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, cat:'landmark' };
+  hideSheet();
+  if (!userLocation) {
+    showConfirm('📍 Location needed',
+      'To navigate, we need your GPS location. Tap "Enable" to continue.',
+      'Enable GPS',
+      () => locateMe(() => buildRoute(dest))
+    );
+    return;
+  }
+  buildRoute(dest);
+}
 
 </script>
 </body>
