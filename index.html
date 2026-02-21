@@ -513,11 +513,11 @@ body {
 }
 .dir-step:last-child { border-bottom: none; }
 .dir-step-num {
-  width: 24px; height: 24px;
-  border-radius: 50%;
-  background: var(--blue);
-  color: white;
-  font-size: 11px;
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--blue-light);
+  color: var(--blue);
+  font-size: 16px;
   font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
@@ -871,6 +871,57 @@ body {
   font-weight: 700;
   font-family: 'DM Sans', sans-serif;
   cursor: pointer;
+}
+
+/* ─── NAV SHEET SCROLLABLE BODY ─── */
+.nav-panel {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+.nav-sheet-body {
+  overflow-y: auto;
+  flex: 1;
+  padding-bottom: 8px;
+  /* hide scrollbar on webkit but keep it functional */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.nav-sheet-body::-webkit-scrollbar { width: 4px; }
+.nav-sheet-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ─── LIVE NAVIGATION STEP BANNER ─── */
+.live-step-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--blue);
+  color: white;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.live-step-arrow {
+  font-size: 32px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.live-step-text {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.live-step-dist {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+.dir-step.active-step {
+  background: var(--blue-light);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin: 0 -8px;
 }
 
 /* ─── TOAST ─── */
@@ -1595,11 +1646,22 @@ function startNavigateTo(destId) {
   buildRoute(dest);
 }
 
+// ── live tracking state ──
+let navWatchId       = null;
+let navDest          = null;
+let navSteps         = [];
+let navStepIndex     = 0;
+let navRouteCoords   = [];
+let navPolyline      = null;
+let navSheetMinimized = false;
+
 function buildRoute(dest) {
   if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+  stopLiveTracking(); // clear any previous watch
 
+  navDest = dest;
   const start = L.latLng(userLocation[0], userLocation[1]);
-  const end = L.latLng(dest.lat, dest.lng);
+  const end   = L.latLng(dest.lat, dest.lng);
 
   routingControl = L.Routing.control({
     waypoints: [start, end],
@@ -1617,77 +1679,274 @@ function buildRoute(dest) {
 
   routingControl.on('routesfound', function(e) {
     const route = e.routes[0];
+    navSteps       = route.instructions || [];
+    navStepIndex   = 0;
+    navRouteCoords = route.coordinates || [];
+
     const dist = fmtDist(route.summary.totalDistance);
     const time = Math.ceil(route.summary.totalTime / 60) + ' min';
 
     document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
-    document.getElementById('navProgressSub').textContent = `${dist} · Est. ${time}`;
+    document.getElementById('navProgressSub').textContent  = `${dist} · Est. ${time}`;
     document.getElementById('navProgress').classList.add('show');
 
     showNavSheet(dest, route);
+    startLiveTracking();
+  });
+
+  routingControl.on('routingerror', function() {
+    // OSRM could not find a road route — fall back to straight-line with landmark note
+    showToast('⚠️ No road route found — showing straight line');
+    const dist = fmtDist(haversine(userLocation[0],userLocation[1],dest.lat,dest.lng));
+    document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
+    document.getElementById('navProgressSub').textContent  = `~${dist} straight line`;
+    document.getElementById('navProgress').classList.add('show');
+    // Draw straight dashed line
+    if (navPolyline) { map.removeLayer(navPolyline); }
+    navPolyline = L.polyline([userLocation,[dest.lat,dest.lng]], {
+      color:'#1a73e8', weight:4, dashArray:'10,8', opacity:0.7
+    }).addTo(map);
+    showNavSheetFallback(dest, dist);
+    startLiveTracking();
   });
 
   map.fitBounds([userLocation, [dest.lat, dest.lng]], { padding: [60, 60] });
 }
 
-function showNavSheet(dest, route) {
-  const m = CAT_META[dest.cat] || CAT_META.landmark;
-  const dist = fmtDist(route.summary.totalDistance);
-  const time = Math.ceil(route.summary.totalTime / 60);
+function startLiveTracking() {
+  if (!navigator.geolocation) return;
+  navWatchId = navigator.geolocation.watchPosition(
+    pos => onNavPosition(pos),
+    err => showToast('GPS signal lost'),
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+  );
+}
 
-  const steps = (route.instructions || []).slice(0, 8).map((s, i) => `
-    <div class="dir-step">
-      <div class="dir-step-num">${i+1}</div>
+function stopLiveTracking() {
+  if (navWatchId !== null) {
+    navigator.geolocation.clearWatch(navWatchId);
+    navWatchId = null;
+  }
+}
+
+function onNavPosition(pos) {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  userLocation = [lat, lng];
+
+  // Move user marker
+  if (userMarker) map.removeLayer(userMarker);
+  userMarker = L.circleMarker([lat, lng], {
+    radius: 10, fillColor: '#1a73e8', color: 'white', weight: 3, fillOpacity: 1
+  }).addTo(map);
+
+  if (!navDest) return;
+
+  const distToDest = haversine(lat, lng, navDest.lat, navDest.lng);
+
+  // ── Arrival detection ──
+  if (distToDest < 25) {
+    showToast('✅ You have arrived at ' + navDest.name + '!');
+    stopNavigation();
+    return;
+  }
+
+  // ── Update progress bar with live distance ──
+  document.getElementById('navProgressSub').textContent =
+    fmtDist(distToDest) + ' remaining · ' + getETA(distToDest);
+
+  // ── Advance step index based on proximity to each step's waypoint ──
+  if (navSteps.length > 0 && navStepIndex < navSteps.length - 1) {
+    const currentStep = navSteps[navStepIndex];
+    // LRM instruction.index is the coordinate index where this step ends
+    const exitCoordIndex = currentStep ? currentStep.index : null;
+    if (exitCoordIndex != null) {
+      const exit = navRouteCoords[exitCoordIndex] || null;
+      if (exit) {
+        const distToExit = haversine(lat, lng, exit.lat, exit.lng);
+        if (distToExit < 25) {
+          navStepIndex = Math.min(navStepIndex + 1, navSteps.length - 1);
+          updateLiveStepDisplay();
+          const upcoming = navSteps[navStepIndex];
+          if (upcoming) showToast('➡️ ' + upcoming.text);
+        }
+      }
+    }
+  }
+
+  // ── Keep map centred on user with slight offset toward destination ──
+  map.panTo([lat, lng], { animate: true, duration: 0.5 });
+}
+
+function toggleNavSheet() {
+  navSheetMinimized = !navSheetMinimized;
+  const body  = document.getElementById('navSheetBody');
+  const icon  = document.getElementById('navMinimizeIcon');
+  const sheet = document.getElementById('bottomSheet');
+  if (!body || !icon) return;
+  if (navSheetMinimized) {
+    body.style.display = 'none';
+    icon.textContent   = '⬆️';
+    icon.title         = 'Expand directions';
+  } else {
+    body.style.display = '';
+    icon.textContent   = '⬇️';
+    icon.title         = 'Minimise directions';
+    updateLiveStepDisplay(); // re-render current step in case it changed while minimised
+  }
+}
+
+function getETA(distMetres) {
+  // Assume average walking speed 4km/h = 67m/min
+  const mins = Math.ceil(distMetres / 67);
+  return mins < 1 ? 'almost there' : mins + ' min';
+}
+
+function updateLiveStepDisplay() {
+  const el = document.getElementById('liveCurrentStep');
+  if (!el || !navSteps[navStepIndex]) return;
+  const s = navSteps[navStepIndex];
+  el.innerHTML = `
+    <div class="live-step-arrow">${getStepArrow(s.type)}</div>
+    <div class="live-step-text">${s.text}${s.distance > 5 ? '<br><span class="live-step-dist">~' + fmtDist(s.distance) + '</span>' : ''}</div>
+  `;
+}
+
+function getStepArrow(type) {
+  const arrows = {
+    'Left'          : '↰',
+    'SlightLeft'    : '↖',
+    'SharpLeft'     : '↩',
+    'Right'         : '↱',
+    'SlightRight'   : '↗',
+    'SharpRight'    : '↪',
+    'Straight'      : '↑',
+    'DestinationReached': '🏁',
+    'WaypointReached'   : '📍',
+  };
+  return arrows[type] || '↑';
+}
+
+function showNavSheet(dest, route) {
+  const m         = CAT_META[dest.cat] || CAT_META.landmark;
+  const dist      = fmtDist(route.summary.totalDistance);
+  const time      = Math.ceil(route.summary.totalTime / 60);
+  const firstStep = navSteps[0];
+  navSheetMinimized = false;
+
+  const allSteps = navSteps.map((s, i) => `
+    <div class="dir-step ${i === navStepIndex ? 'active-step' : ''}">
+      <div class="dir-step-num">${getStepArrow(s.type)}</div>
       <div>
         <div class="dir-step-text">${s.text}</div>
         ${s.distance > 5 ? `<div class="dir-step-sub">~${fmtDist(s.distance)}</div>` : ''}
       </div>
-    </div>
-  `).join('');
-
-  const lmSteps = getLandmarkDirections(dest);
-  const lmHTML = lmSteps.length ? `
-    <div class="lm-directions">
-      <div class="lm-directions-title">🏘️ Local Landmark Guide</div>
-      ${lmSteps.map((s,i) => `
-        <div class="lm-dir-step">
-          <div class="lm-dir-num">${i+1}</div>
-          <div class="lm-dir-text">${s}</div>
-        </div>`).join('')}
-    </div>` : '';
+    </div>`).join('');
 
   showSheet(`
     <div class="nav-panel">
       <div class="nav-header">
         <span>${m.icon}</span>
-        <h3>Route to ${dest.name}</h3>
+        <h3>Navigating to ${dest.name}</h3>
+        <button class="icon-btn" id="navMinimizeIcon" title="Minimise directions"
+          onclick="toggleNavSheet()">⬇️</button>
         <button class="icon-btn" onclick="stopNavigation()">✕</button>
       </div>
-      <div style="display:flex;gap:12px;margin-bottom:14px;">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-          <div class="nav-dot start"></div>
-          <div class="nav-line"></div>
-          <div class="nav-dot end"></div>
-        </div>
-        <div style="flex:1;">
-          <div class="nav-stop" style="border:none;padding:0 0 12px;">
-            <div class="nav-stop-label">Your Location <span>Current position</span></div>
-          </div>
-          <div class="nav-stop" style="border:none;padding:0;">
-            <div class="nav-stop-label">${dest.name} <span>${dest.landmark.substring(0,50)}…</span></div>
-          </div>
+
+      <!-- LIVE NEXT-STEP BANNER — always visible even when minimised -->
+      <div class="live-step-banner" id="liveCurrentStep">
+        <div class="live-step-arrow">${firstStep ? getStepArrow(firstStep.type) : '↑'}</div>
+        <div class="live-step-text">
+          ${firstStep ? firstStep.text : 'Follow the route'}
+          ${firstStep && firstStep.distance > 5
+            ? '<br><span class="live-step-dist">~' + fmtDist(firstStep.distance) + '</span>'
+            : ''}
         </div>
       </div>
-      <div class="nav-summary">
-        <div class="nav-stat"><div class="nav-stat-val">${dist}</div><div class="nav-stat-lbl">Distance</div></div>
-        <div class="nav-stat"><div class="nav-stat-val">${time}</div><div class="nav-stat-lbl">Minutes</div></div>
-        <div class="nav-stat"><div class="nav-stat-val">${m.icon}</div><div class="nav-stat-lbl">${m.label}</div></div>
+
+      <!-- COLLAPSIBLE BODY -->
+      <div id="navSheetBody" class="nav-sheet-body">
+        <div style="display:flex;gap:12px;margin-bottom:14px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div class="nav-dot start"></div>
+            <div class="nav-line"></div>
+            <div class="nav-dot end"></div>
+          </div>
+          <div style="flex:1;">
+            <div class="nav-stop" style="border:none;padding:0 0 12px;">
+              <div class="nav-stop-label">Your Location <span>Live tracking active</span></div>
+            </div>
+            <div class="nav-stop" style="border:none;padding:0;">
+              <div class="nav-stop-label">${dest.name}
+                <span>${dest.landmark.substring(0, 50)}…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-summary">
+          <div class="nav-stat">
+            <div class="nav-stat-val">${dist}</div>
+            <div class="nav-stat-lbl">Distance</div>
+          </div>
+          <div class="nav-stat">
+            <div class="nav-stat-val">${time} min</div>
+            <div class="nav-stat-lbl">Est. time</div>
+          </div>
+          <div class="nav-stat">
+            <div class="nav-stat-val">${m.icon}</div>
+            <div class="nav-stat-lbl">${m.label}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <div style="font-size:12px;font-weight:700;color:#5f6368;
+            letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">
+            All Steps
+          </div>
+          <div class="dir-steps">${allSteps}</div>
+        </div>
+
+        <div style="margin-top:12px;padding:10px 14px;background:var(--green-light);
+          border-radius:var(--radius);font-size:12px;color:#0a7a3e;line-height:1.5;">
+          📍 <strong>Local guide:</strong> ${dest.landmark}
+        </div>
       </div>
-      ${lmHTML}
-      <div style="margin-top:14px;">
-        <div style="font-size:12px;font-weight:700;color:#5f6368;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Turn-by-Turn Directions</div>
-        <div class="dir-steps">
-          ${steps || `<div class="dir-step"><div class="dir-step-num">1</div><div><div class="dir-step-text">${dest.landmark}</div></div></div>`}
+    </div>
+  `);
+}
+
+function showNavSheetFallback(dest, distStr) {
+  const m         = CAT_META[dest.cat] || CAT_META.landmark;
+  const bearing   = getBearing(userLocation[0], userLocation[1], dest.lat, dest.lng);
+  const direction = bearingToCardinal(bearing);
+  navSheetMinimized = false;
+
+  showSheet(`
+    <div class="nav-panel">
+      <div class="nav-header">
+        <span>${m.icon}</span>
+        <h3>Heading to ${dest.name}</h3>
+        <button class="icon-btn" id="navMinimizeIcon" title="Minimise directions"
+          onclick="toggleNavSheet()">⬇️</button>
+        <button class="icon-btn" onclick="stopNavigation()">✕</button>
+      </div>
+
+      <!-- LIVE DIRECTION BANNER — always visible -->
+      <div class="live-step-banner" id="liveCurrentStep">
+        <div class="live-step-arrow" style="font-size:28px;">↑</div>
+        <div class="live-step-text">
+          Head <strong>${direction}</strong> — ~${distStr} away
+        </div>
+      </div>
+
+      <!-- COLLAPSIBLE BODY -->
+      <div id="navSheetBody" class="nav-sheet-body">
+        <div style="padding:12px 0;background:var(--yellow-light);border-radius:var(--radius);
+          padding:12px 14px;font-size:13px;color:#8a5a00;line-height:1.6;">
+          ⚠️ No road route found. This path may not be mapped in OpenStreetMap yet.
+          The dashed line shows the straight-line direction.<br><br>
+          📍 <strong>Look for:</strong> ${dest.landmark}
         </div>
       </div>
     </div>
@@ -1695,7 +1954,12 @@ function showNavSheet(dest, route) {
 }
 
 function stopNavigation() {
+  stopLiveTracking();
+  navDest      = null;
+  navSteps     = [];
+  navStepIndex = 0;
   if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+  if (navPolyline)    { map.removeLayer(navPolyline); navPolyline = null; }
   document.getElementById('navProgress').classList.remove('show');
   hideSheet();
 }
@@ -2876,48 +3140,18 @@ function renderZoneLabels() {
 }
 
 // ══════════════════════════════════════════════════════
-// LANDMARK-BASED DIRECTIONS
+// BEARING UTILITIES (used by nav fallback)
 // ══════════════════════════════════════════════════════
 function getBearing(lat1, lng1, lat2, lng2) {
-  const d = Math.PI/180;
-  const y = Math.sin((lng2-lng1)*d)*Math.cos(lat2*d);
-  const x = Math.cos(lat1*d)*Math.sin(lat2*d) - Math.sin(lat1*d)*Math.cos(lat2*d)*Math.cos((lng2-lng1)*d);
-  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+  const d = Math.PI / 180;
+  const y = Math.sin((lng2 - lng1) * d) * Math.cos(lat2 * d);
+  const x = Math.cos(lat1 * d) * Math.sin(lat2 * d)
+          - Math.sin(lat1 * d) * Math.cos(lat2 * d) * Math.cos((lng2 - lng1) * d);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 function bearingToCardinal(deg) {
-  return ['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(deg/45)%8];
-}
-
-function getLandmarkDirections(dest) {
-  const steps = [];
-  if (!dest) return steps;
-  const MARKET = { lat:5.6349, lng:10.0359 };
-  const ANCHORS = [
-    { name:'3 Corners junction', lat:5.6344, lng:10.0369, id:'s7' },
-    { name:'the Catholic Hospital', lat:5.6305, lng:10.0414, id:'s8' },
-    { name:'the Fotang Health Centre', lat:5.6265, lng:10.0323, id:'s15' },
-    { name:"the Fon's Palace", lat:5.6463, lng:10.0374, id:'s6' },
-  ];
-  const distFromMarket = haversine(MARKET.lat, MARKET.lng, dest.lat, dest.lng);
-  if (distFromMarket < 80) {
-    steps.push('Start at Nkongle Market — your destination is right here at the market.');
-    return steps;
-  }
-  steps.push('Start at Nkongle Market (the main market in the centre of Leteh).');
-  const dir = bearingToCardinal(getBearing(MARKET.lat, MARKET.lng, dest.lat, dest.lng));
-  const useful = ANCHORS.filter(a => a.id !== dest.id && haversine(a.lat, a.lng, dest.lat, dest.lng) < distFromMarket);
-  useful.sort((a,b) => haversine(a.lat,a.lng,dest.lat,dest.lng)-haversine(b.lat,b.lng,dest.lat,dest.lng));
-  if (useful.length > 0) {
-    const via = useful[0];
-    const dirToVia = bearingToCardinal(getBearing(MARKET.lat,MARKET.lng,via.lat,via.lng));
-    steps.push(`Head ${dirToVia} from Nkongle market (~${fmtDist(haversine(MARKET.lat,MARKET.lng,via.lat,via.lng))}) towards ${via.name}.`);
-    const dirFinal = bearingToCardinal(getBearing(via.lat,via.lng,dest.lat,dest.lng));
-    steps.push(`From ${via.name}, continue ${dirFinal} about ${fmtDist(haversine(via.lat,via.lng,dest.lat,dest.lng))}.`);
-  } else {
-    steps.push(`Head ${dir} from Nkongle market for about ${fmtDist(distFromMarket)}.`);
-  }
-  steps.push(`Look for: ${dest.landmark}`);
-  return steps;
+  return ['north','north-east','east','south-east',
+          'south','south-west','west','north-west'][Math.round(deg / 45) % 8];
 }
 
 // ══════════════════════════════════════════════════════
