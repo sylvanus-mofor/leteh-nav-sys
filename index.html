@@ -1390,9 +1390,9 @@ function loadData() {
   try {
     const stored = localStorage.getItem('mmuock_landmarks');
     const version = localStorage.getItem('mmuock_version');
-    if (!version || version !== 'v2') {
+    if (!version || version !== 'v1') {
       landmarks = [...SEED];
-      localStorage.setItem('mmuock_version', 'v2');
+      localStorage.setItem('mmuock_version', 'v1');
     } else {
       landmarks = stored ? JSON.parse(stored) : [...SEED];
     }
