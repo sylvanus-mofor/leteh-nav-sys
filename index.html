@@ -820,7 +820,7 @@ body {
 .share-banner {
   position: absolute;
   top: 74px; left: 12px; right: 12px;
-  z-index: 750;
+  z-index: 949;
   background: var(--green);
   color: white;
   border-radius: var(--radius-pill);
@@ -833,6 +833,7 @@ body {
   font-weight: 600;
   animation: slideDown 0.25s ease;
 }
+
 .share-banner.show { display: flex; }
 @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .share-banner-dot {
@@ -848,7 +849,7 @@ body {
 .nav-progress {
   position: absolute;
   top: 72px; left: 12px; right: 12px;
-  z-index: 750;
+  z-index: 950;
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
@@ -857,6 +858,7 @@ body {
   align-items: center;
   gap: 12px;
 }
+
 .nav-progress.show { display: flex; }
 .nav-progress-info { flex: 1; }
 .nav-progress-dest { font-size: 14px; font-weight: 700; }
@@ -1390,9 +1392,9 @@ function loadData() {
   try {
     const stored = localStorage.getItem('mmuock_landmarks');
     const version = localStorage.getItem('mmuock_version');
-    if (!version || version !== 'v1') {
+    if (!version || version !== 'v2') {
       landmarks = [...SEED];
-      localStorage.setItem('mmuock_version', 'v1');
+      localStorage.setItem('mmuock_version', 'v2');
     } else {
       landmarks = stored ? JSON.parse(stored) : [...SEED];
     }
