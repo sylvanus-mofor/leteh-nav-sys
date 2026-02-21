@@ -1435,6 +1435,7 @@ function initMap() {
   renderAllMarkers();
   renderZoneLabels();
   initMarketDayBanner();
+  document.getElementById('bottomSheet').style.display = 'none';
 }
 
 function mkIcon(cat) {
@@ -1638,7 +1639,7 @@ function startNavigateTo(destId) {
       'To navigate, we need your GPS location. Tap "Enable" to share your location.',
       'Enable GPS',
       () => {
-        locateMe(() => buildRoute(dest));
+        locateMe(function() { buildRoute(dest); });
       }
     );
     return;
@@ -1657,11 +1658,50 @@ let navSheetMinimized = false;
 
 function buildRoute(dest) {
   if (routingControl) { map.removeControl(routingControl); routingControl = null; }
-  stopLiveTracking(); // clear any previous watch
+  if (navPolyline)    { map.removeLayer(navPolyline); navPolyline = null; }
+  stopLiveTracking();
 
   navDest = dest;
-  const start = L.latLng(userLocation[0], userLocation[1]);
-  const end   = L.latLng(dest.lat, dest.lng);
+
+  const startLat = userLocation[0];
+  const startLng = userLocation[1];
+  const endLat   = dest.lat;
+  const endLng   = dest.lng;
+
+  const straightDist = haversine(startLat, startLng, endLat, endLng);
+
+  // ─────────────────────────────────────────────
+  // CASE 1: VERY CLOSE (< 200m) → STRAIGHT LINE ONLY
+  // ─────────────────────────────────────────────
+  let navMode = 'osrm'; // or 'direct'
+  if (straightDist < 200) {
+    navMode = 'direct';
+    const distStr   = fmtDist(straightDist);
+    const bearing   = getBearing(startLat, startLng, endLat, endLng);
+    const direction = bearingToCardinal(bearing);
+
+    document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
+    document.getElementById('navProgressSub').textContent  = `~${distStr} · ${direction}`;
+    document.getElementById('navProgress').classList.add('show');
+
+    navPolyline = L.polyline(
+      [[startLat, startLng], [endLat, endLng]],
+      { color:'#1a73e8', weight:4, dashArray:'8,6', opacity:0.8 }
+    ).addTo(map);
+
+    showNavSheetFallback(dest, distStr);
+    startLiveTracking();
+
+    map.fitBounds([[startLat, startLng], [endLat, endLng]], { padding: [60, 60] });
+    return;
+  }
+
+  // ─────────────────────────────────────────────
+  // CASE 2 & 3: USE OSRM (WITH VALIDATION)
+  // ─────────────────────────────────────────────
+  navMode = 'osrm';
+  const start = L.latLng(startLat, startLng);
+  const end   = L.latLng(endLat, endLng);
 
   routingControl = L.Routing.control({
     waypoints: [start, end],
@@ -1670,20 +1710,46 @@ function buildRoute(dest) {
     draggableWaypoints: false,
     fitSelectedRoutes: true,
     lineOptions: {
-      styles: [{ color: '#1a73e8', opacity: 0.9, weight: 6 }],
-      extendToWaypoints: true,
-      missingRouteTolerance: 0
+      styles: [{ color: '#1a73e8', opacity: 0.9, weight: 6 }]
     },
-    createMarker: () => null,
+    createMarker: () => null
   }).addTo(map);
 
-  routingControl.on('routesfound', function(e) {
+  routingControl.on('routesfound', e => {
     const route = e.routes[0];
+    const routeDist = route.summary.totalDistance;
+
+    // ── Validation for mid-range (200m–1km)
+    if (straightDist < 1000 && routeDist > straightDist * 3) {
+      // OSRM clearly went the wrong way
+      showToast('⚠️ Route looks incorrect — showing direct path instead');
+
+      const distStr = fmtDist(straightDist);
+      document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
+      document.getElementById('navProgressSub').textContent  = `~${distStr} straight line`;
+      document.getElementById('navProgress').classList.add('show');
+
+      if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+      }
+
+      navPolyline = L.polyline(
+        [[startLat, startLng], [endLat, endLng]],
+        { color:'#1a73e8', weight:4, dashArray:'10,8', opacity:0.7 }
+      ).addTo(map);
+
+      showNavSheetFallback(dest, distStr);
+      startLiveTracking();
+      return;
+    }
+
+    // ── OSRM route accepted
     navSteps       = route.instructions || [];
     navStepIndex   = 0;
     navRouteCoords = route.coordinates || [];
 
-    const dist = fmtDist(route.summary.totalDistance);
+    const dist = fmtDist(routeDist);
     const time = Math.ceil(route.summary.totalTime / 60) + ' min';
 
     document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
@@ -1694,23 +1760,24 @@ function buildRoute(dest) {
     startLiveTracking();
   });
 
-  routingControl.on('routingerror', function() {
-    // OSRM could not find a road route — fall back to straight-line with landmark note
+  routingControl.on('routingerror', () => {
     showToast('⚠️ No road route found — showing straight line');
-    const dist = fmtDist(haversine(userLocation[0],userLocation[1],dest.lat,dest.lng));
+
+    const distStr = fmtDist(straightDist);
     document.getElementById('navProgressDest').textContent = '→ ' + dest.name;
-    document.getElementById('navProgressSub').textContent  = `~${dist} straight line`;
+    document.getElementById('navProgressSub').textContent  = `~${distStr} straight line`;
     document.getElementById('navProgress').classList.add('show');
-    // Draw straight dashed line
-    if (navPolyline) { map.removeLayer(navPolyline); }
-    navPolyline = L.polyline([userLocation,[dest.lat,dest.lng]], {
-      color:'#1a73e8', weight:4, dashArray:'10,8', opacity:0.7
-    }).addTo(map);
-    showNavSheetFallback(dest, dist);
+
+    navPolyline = L.polyline(
+      [[startLat, startLng], [endLat, endLng]],
+      { color:'#1a73e8', weight:4, dashArray:'10,8', opacity:0.7 }
+    ).addTo(map);
+
+    showNavSheetFallback(dest, distStr);
     startLiveTracking();
   });
 
-  map.fitBounds([userLocation, [dest.lat, dest.lng]], { padding: [60, 60] });
+  map.fitBounds([[startLat, startLng], [endLat, endLng]], { padding: [60, 60] });
 }
 
 function startLiveTracking() {
@@ -1745,7 +1812,7 @@ function onNavPosition(pos) {
   const distToDest = haversine(lat, lng, navDest.lat, navDest.lng);
 
   // ── Arrival detection ──
-  if (distToDest < 25) {
+  if (distToDest < 40) {
     showToast('✅ You have arrived at ' + navDest.name + '!');
     stopNavigation();
     return;
@@ -1764,8 +1831,10 @@ function onNavPosition(pos) {
       const exit = navRouteCoords[exitCoordIndex] || null;
       if (exit) {
         const distToExit = haversine(lat, lng, exit.lat, exit.lng);
-        if (distToExit < 25) {
+        if (distToExit < 40) {
           navStepIndex = Math.min(navStepIndex + 1, navSteps.length - 1);
+          if (!navSteps.length) return;
+          if (!navSteps || !navSteps.length) return;
           updateLiveStepDisplay();
           const upcoming = navSteps[navStepIndex];
           if (upcoming) showToast('➡️ ' + upcoming.text);
@@ -1780,18 +1849,19 @@ function onNavPosition(pos) {
 
 function toggleNavSheet() {
   navSheetMinimized = !navSheetMinimized;
-  const body  = document.getElementById('navSheetBody');
-  const icon  = document.getElementById('navMinimizeIcon');
-  const sheet = document.getElementById('bottomSheet');
+  const body = document.getElementById('navSheetBody');
+  const icon = document.getElementById('navMinimizeIcon');
+  
   if (!body || !icon) return;
+  
   if (navSheetMinimized) {
     body.style.display = 'none';
-    icon.textContent   = '⬆️';
-    icon.title         = 'Expand directions';
+    icon.textContent = '⬆️';
+    icon.title = 'Expand directions';
   } else {
-    body.style.display = '';
-    icon.textContent   = '⬇️';
-    icon.title         = 'Minimise directions';
+    body.style.display = 'block';
+    icon.textContent = '⬇️';
+    icon.title = 'Minimise directions';
     updateLiveStepDisplay(); // re-render current step in case it changed while minimised
   }
 }
@@ -1804,7 +1874,16 @@ function getETA(distMetres) {
 
 function updateLiveStepDisplay() {
   const el = document.getElementById('liveCurrentStep');
-  if (!el || !navSteps[navStepIndex]) return;
+  if (!el) return;
+  
+  if (!navSteps || navSteps.length === 0 || navStepIndex >= navSteps.length) {
+    el.innerHTML = `
+      <div class="live-step-arrow">↑</div>
+      <div class="live-step-text">Follow the route to your destination</div>
+    `;
+    return;
+  }
+  
   const s = navSteps[navStepIndex];
   el.innerHTML = `
     <div class="live-step-arrow">${getStepArrow(s.type)}</div>
@@ -1827,6 +1906,7 @@ function getStepArrow(type) {
   return arrows[type] || '↑';
 }
 
+// Update showNavSheet function - replace the sheet HTML section:
 function showNavSheet(dest, route) {
   const m         = CAT_META[dest.cat] || CAT_META.landmark;
   const dist      = fmtDist(route.summary.totalDistance);
@@ -1865,7 +1945,7 @@ function showNavSheet(dest, route) {
       </div>
 
       <!-- COLLAPSIBLE BODY -->
-      <div id="navSheetBody" class="nav-sheet-body">
+      <div id="navSheetBody" class="nav-sheet-body" style="display:block;">
         <div style="display:flex;gap:12px;margin-bottom:14px;">
           <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
             <div class="nav-dot start"></div>
@@ -1916,6 +1996,7 @@ function showNavSheet(dest, route) {
   `);
 }
 
+// Update showNavSheetFallback function - replace the sheet HTML section:
 function showNavSheetFallback(dest, distStr) {
   const m         = CAT_META[dest.cat] || CAT_META.landmark;
   const bearing   = getBearing(userLocation[0], userLocation[1], dest.lat, dest.lng);
@@ -1941,7 +2022,7 @@ function showNavSheetFallback(dest, distStr) {
       </div>
 
       <!-- COLLAPSIBLE BODY -->
-      <div id="navSheetBody" class="nav-sheet-body">
+      <div id="navSheetBody" class="nav-sheet-body" style="display:block;">
         <div style="padding:12px 0;background:var(--yellow-light);border-radius:var(--radius);
           padding:12px 14px;font-size:13px;color:#8a5a00;line-height:1.6;">
           ⚠️ No road route found. This path may not be mapped in OpenStreetMap yet.
@@ -2611,6 +2692,7 @@ function showWeather() {
   fetchAndShowWeather();
 }
 
+// Replace the existing fetchAndShowWeather function with this:
 function fetchAndShowWeather() {
   const lat = userLocation[0];
   const lng = userLocation[1];
@@ -2621,7 +2703,7 @@ function fetchAndShowWeather() {
       weatherCache.lat === lat && 
       weatherCache.lng === lng && 
       now - weatherCache.timestamp < 30 * 60 * 1000) {
-    showWeatherSheet(weatherCache.data);
+    displayWeatherSheet(weatherCache.data);
     return;
   }
   
@@ -2641,13 +2723,109 @@ function fetchAndShowWeather() {
         lng: lng
       };
       
-      showWeatherSheet(data);
+      displayWeatherSheet(data);
     })
     .catch(error => {
       console.error('Weather fetch error:', error);
       showToast('Could not load weather. Using offline forecast.');
       showOfflineWeather();
     });
+}
+
+// Helper function to display weather sheet
+function displayWeatherSheet(data) {
+  const current = data.current_weather;
+  const daily = data.daily;
+  
+  const weatherCode = current.weathercode;
+  const isDay = current.is_day === 1;
+  const weatherIcon = getWeatherIcon(weatherCode, isDay);
+  const temperature = Math.round(current.temperature);
+  
+  // Get farming tip
+  const tip = getFarmingTip(data);
+  
+  // Format sunrise/sunset times
+  const sunrise = daily.sunrise[0] ? new Date(daily.sunrise[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '6:00 AM';
+  const sunset = daily.sunset[0] ? new Date(daily.sunset[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '6:30 PM';
+  
+  // Generate 7-day forecast
+  const forecastHTML = daily.time.map((date, i) => {
+    if (i >= 7) return '';
+    const dayName = getDayName(i);
+    const icon = getWeatherIcon(daily.weathercode[i], true);
+    const maxTemp = Math.round(daily.temperature_2m_max[i]);
+    const rainProb = daily.precipitation_probability_max[i] || 0;
+    
+    return `
+      <div class="weather-day-card">
+        <div class="weather-day-name">${dayName}</div>
+        <div class="weather-day-icon">${icon}</div>
+        <div class="weather-day-temp">${maxTemp}°</div>
+        <div class="weather-day-rain">
+          <span>💧</span> ${rainProb}%
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Weather description
+  const weatherDesc = getWeatherDescription(weatherCode);
+  
+  showSheet(`
+    <div class="weather-tab" style="position:relative; z-index:2000; background:white; box-shadow:0 -4px 24px rgba(0,0,0,0.2);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="font-size:16px;font-weight:700;">🌤️ Weather Forecast</h3>
+        <button class="icon-btn" onclick="hideSheet()">✕</button>
+      </div>
+      
+      <div class="weather-current">
+        <div class="weather-current-icon">${weatherIcon}</div>
+        <div>
+          <div class="weather-current-temp">${temperature}°C</div>
+          <div class="weather-current-desc">${weatherDesc}</div>
+        </div>
+      </div>
+      
+      <div class="weather-farming-tip">
+        <div class="weather-farming-tip-icon">${tip.icon}</div>
+        <div class="weather-farming-tip-text">${tip.text}</div>
+      </div>
+      
+      <div class="weather-days">
+        ${forecastHTML}
+      </div>
+      
+      <div class="weather-sun-times">
+        <div class="weather-sun-item">
+          <div class="weather-sun-icon">🌅</div>
+          <div class="weather-sun-label">Sunrise</div>
+          <div class="weather-sun-time">${sunrise}</div>
+        </div>
+        <div class="weather-sun-item">
+          <div class="weather-sun-icon">🌇</div>
+          <div class="weather-sun-label">Sunset</div>
+          <div class="weather-sun-time">${sunset}</div>
+        </div>
+      </div>
+      
+      ${daily.precipitation_probability_max[0] > 60 ? `
+        <div class="weather-alert">
+          <div class="weather-alert-icon">⚠️</div>
+          <div class="weather-alert-text">Heavy rain expected today. Protect crops from flooding.</div>
+        </div>
+      ` : daily.temperature_2m_max[0] > 35 ? `
+        <div class="weather-alert">
+          <div class="weather-alert-icon">🔥</div>
+          <div class="weather-alert-text">Extreme heat! Water crops in evening. Watch for wilting.</div>
+        </div>
+      ` : ''}
+      
+      <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text-hint);">
+        Updated just now · 7-day forecast
+      </div>
+    </div>
+  `);
 }
 
 function getWeatherIcon(weatherCode, isDay = true) {
@@ -3253,7 +3431,9 @@ function showSeasonalFarmland() {
 // SERVICE WORKER (offline tiles)
 // ══════════════════════════════════════════════════════
 if ('serviceWorker' in navigator) {
-  const sw = `
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    if (registrations.length === 0) {
+      const sw = `
 const TC='mmuock-tiles-v1';
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',()=>self.clients.claim());
@@ -3267,8 +3447,10 @@ self.addEventListener('fetch',e=>{
     }));
   }
 });`;
-  const blob = new Blob([sw], {type:'application/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(blob));
+      const blob = new Blob([sw], {type:'application/javascript'});
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(e => console.log('SW registration skipped:', e));
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════
